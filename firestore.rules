@@ -1,0 +1,90 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return request.auth.token.role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && role() == 'admin';
+    }
+
+    function isTeacher() {
+      return isSignedIn() && role() == 'teacher';
+    }
+
+    function isStaff() {
+      return isSignedIn() && role() == 'staff';
+    }
+
+    function isStaffOrTeacher() {
+      return isTeacher() || isStaff();
+    }
+
+    function isPortalUser() {
+      return isAdmin() || isTeacher() || isStaff();
+    }
+
+    // Users — profile records for authenticated portal users.
+    // All signed-in portal staff need to see each other's names for assignments.
+    match /users/{uid} {
+      allow read: if isPortalUser();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Classes — admin-managed.
+    match /classes/{classId} {
+      allow read: if isPortalUser();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Students — admin creates/edits/promotes; teachers and staff can read.
+    match /students/{studentId} {
+      allow read: if isPortalUser();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Subjects — teacher and staff can add; admin can do anything.
+    match /subjects/{subjectId} {
+      allow read: if isPortalUser();
+      allow create: if isStaffOrTeacher() || isAdmin();
+      allow update, delete: if isAdmin()
+        || (isStaffOrTeacher() && resource.data.teacherId == request.auth.uid);
+    }
+
+    // Attendance — teachers and staff mark and edit any record; admin can delete.
+    // Attendance is a shared classroom record, not owned by the original marker.
+    match /attendance/{attendanceId} {
+      allow read: if isPortalUser();
+      allow create, update: if isStaffOrTeacher() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Results — staff and teachers upload; only uploader or admin can edit.
+    match /results/{resultId} {
+      allow read: if isPortalUser();
+      allow create: if isStaffOrTeacher() || isAdmin();
+      allow update, delete: if isAdmin()
+        || (isStaffOrTeacher() && resource.data.uploadedBy == request.auth.uid);
+    }
+
+    // Syllabus — teacher uploads; admin can moderate.
+    match /syllabus/{syllabusId} {
+      allow read: if isPortalUser();
+      allow create: if isTeacher() || isAdmin();
+      allow update, delete: if isAdmin()
+        || (isTeacher() && resource.data.uploadedBy == request.auth.uid);
+    }
+
+    // Deny everything else by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

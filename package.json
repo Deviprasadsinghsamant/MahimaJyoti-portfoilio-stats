@@ -1,0 +1,27 @@
+{
+  "name": "mahimajyoti",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MahimaJyoti — school portfolio + management portal. Monorepo containing the Next.js frontend (mj-web), Cloud Functions backend (mj-func), and one-off maintenance scripts.",
+  "workspaces": [
+    "mj-web",
+    "mj-func",
+    "scripts"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=mj-web",
+    "dev:functions": "npm run dev --workspace=mj-func",
+    "build": "npm run build --workspace=mj-web && npm run build --workspace=mj-func",
+    "build:web": "npm run build --workspace=mj-web",
+    "build:functions": "npm run build --workspace=mj-func",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "seed": "npm run seed --workspace=scripts",
+    "deploy": "npm run deploy:functions && npm run deploy:rules && npm run deploy:web",
+    "deploy:web": "node scripts/deploy/hosting.mjs",
+    "deploy:functions": "firebase deploy --only functions",
+    "deploy:rules": "firebase deploy --only firestore:rules"
+  },
+  "engines": {
+    "node": ">=20 <23"
+  }
+}

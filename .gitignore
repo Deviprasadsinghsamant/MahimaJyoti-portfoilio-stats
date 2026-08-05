@@ -1,0 +1,100 @@
+# ─────────────────────────────────────────────────────────────
+# MahimaJyoti monorepo — root .gitignore
+# Applies across mj-web, mj-func, scripts (each may add its own).
+# ─────────────────────────────────────────────────────────────
+
+# ─── Dependencies ────────────────────────────────────────────
+node_modules/
+.pnp/
+.pnp.*
+.yarn/cache
+.yarn/install-state.gz
+.yarn/build-state.yml
+
+# ─── Build output ────────────────────────────────────────────
+# Next.js
+.next/
+out/
+# TypeScript compiler
+lib/
+dist/
+build/
+build/Release
+*.tsbuildinfo
+# Auto-generated Next files
+mj-web/next-env.d.ts
+
+# ─── Test / coverage ─────────────────────────────────────────
+coverage/
+.nyc_output/
+lib-cov/
+
+# ─── Env & secrets ───────────────────────────────────────────
+# NEVER commit these. Firebase service accounts + local overrides.
+.env
+.env.*
+!.env.example
+scripts/service-account.json
+**/service-account*.json
+**/*serviceAccountKey*.json
+*.pem
+
+# ─── Firebase ────────────────────────────────────────────────
+.firebase/
+firebase-debug.log*
+firebase-debug.*.log*
+.firebaserc.local
+# Data Connect generated files
+.dataconnect/
+# Transient artifact from scripts/deploy/hosting.mjs (workspace-hoist workaround).
+# Only exists mid-deploy; must never be committed.
+package.json.workspace-hidden
+
+# ─── Logs ────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ─── Runtime ─────────────────────────────────────────────────
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ─── Caches ──────────────────────────────────────────────────
+.npm/
+.eslintcache
+.turbo/
+.cache/
+.node_repl_history
+.parcel-cache/
+
+# ─── Packaging ───────────────────────────────────────────────
+*.tgz
+.yarn-integrity
+
+# ─── Editor / IDE ────────────────────────────────────────────
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── OS ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.local
+
+# ─── Vercel (in case of dual-hosting) ────────────────────────
+.vercel/
+
+# ─── Local scratchpads ───────────────────────────────────────
+/scratch/
+/.tmp/
