@@ -31,6 +31,27 @@ service cloud.firestore {
       return isAdmin() || isTeacher() || isStaff();
     }
 
+    // ─── Public portfolio content ────────────────────────────
+    // Portfolio pages fetch these unauthenticated. Only admins may write.
+
+    match /faculty/{facultyId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /galleryItems/{itemId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // One doc per portfolio page: home, about, academics, admissions, contact.
+    match /siteContent/{pageId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────────────────
+
     // Users — profile records for authenticated portal users.
     // All signed-in portal staff need to see each other's names for assignments.
     match /users/{uid} {

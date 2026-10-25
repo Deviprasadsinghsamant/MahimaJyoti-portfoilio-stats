@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "seed": "ts-node seed.ts"
+    "seed": "ts-node seed.ts",
+    "seed:content": "ts-node seed-content.ts"
   },
   "dependencies": {
     "firebase-admin": "^12.0.0"

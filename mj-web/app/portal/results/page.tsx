@@ -133,7 +133,8 @@ function ResultsView() {
                     marksObtained: n,
                     totalMarks,
                     academicYear: ACADEMIC_YEAR,
-                    teacherId: currentSubject.teacherId,
+                    // "" when the subject has no teacher; KPIs show these as "Unassigned".
+                    teacherId: currentSubject.teacherId ?? "",
                     uploadedBy: firebaseUser.uid,
                 });
             }

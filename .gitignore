@@ -15,8 +15,9 @@ node_modules/
 # Next.js
 .next/
 out/
-# TypeScript compiler
-lib/
+# TypeScript compiler output for Cloud Functions. Scoped to mj-func:
+# mj-web/lib is source code (Firebase client, auth, portal data layer).
+mj-func/lib/
 dist/
 build/
 build/Release

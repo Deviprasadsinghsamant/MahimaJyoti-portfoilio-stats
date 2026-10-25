@@ -16,6 +16,7 @@
     "build:functions": "npm run build --workspace=mj-func",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "seed": "npm run seed --workspace=scripts",
+    "seed:content": "npm run seed:content --workspace=scripts",
     "deploy": "npm run deploy:functions && npm run deploy:rules && npm run deploy:web",
     "deploy:web": "node scripts/deploy/hosting.mjs",
     "deploy:functions": "firebase deploy --only functions",

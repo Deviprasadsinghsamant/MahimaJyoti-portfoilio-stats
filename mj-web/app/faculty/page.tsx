@@ -1,109 +1,22 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Mail, BookOpen } from "lucide-react";
-import { FadeIn, StaggerContainer, staggerItem } from "@/components/animations/FadeIn";
 import { motion } from "framer-motion";
-
-const facultyMembers = [
-    {
-        name: "Dr. Suresh Kumar Mishra",
-        role: "Principal & Director of Academics",
-        subject: "Physics",
-        qualification: "Ph.D. in Physics, IIT Kharagpur",
-        experience: "28 years",
-        color: "from-navy-700 to-navy-900",
-    },
-    {
-        name: "Prof. Anjali Mohapatra",
-        role: "Vice Principal",
-        subject: "English Literature",
-        qualification: "M.A., M.Phil. (English), Utkal University",
-        experience: "22 years",
-        color: "from-gold-500 to-gold-700",
-    },
-    {
-        name: "Dr. Rajesh Panda",
-        role: "Head of Science Department",
-        subject: "Chemistry",
-        qualification: "Ph.D. in Organic Chemistry",
-        experience: "20 years",
-        color: "from-blue-500 to-blue-700",
-    },
-    {
-        name: "Mrs. Sanjukta Das",
-        role: "Senior Faculty",
-        subject: "Mathematics",
-        qualification: "M.Sc. Mathematics, NIT Rourkela",
-        experience: "18 years",
-        color: "from-emerald-500 to-emerald-700",
-    },
-    {
-        name: "Dr. Priya Rath",
-        role: "Head of Arts Department",
-        subject: "Political Science",
-        qualification: "Ph.D. in Political Science",
-        experience: "16 years",
-        color: "from-purple-500 to-purple-700",
-    },
-    {
-        name: "Mr. Bibhu Prasad Nayak",
-        role: "Senior Faculty",
-        subject: "Biology",
-        qualification: "M.Sc. Zoology, Berhampur University",
-        experience: "15 years",
-        color: "from-teal-500 to-teal-700",
-    },
-    {
-        name: "Mrs. Laxmipriya Sahoo",
-        role: "Senior Faculty",
-        subject: "Computer Science",
-        qualification: "MCA, IGNOU",
-        experience: "12 years",
-        color: "from-indigo-500 to-indigo-700",
-    },
-    {
-        name: "Mr. Deepak Mohanty",
-        role: "Senior Faculty",
-        subject: "History & Economics",
-        qualification: "M.A. History, Ravenshaw University",
-        experience: "14 years",
-        color: "from-rose-500 to-rose-700",
-    },
-    {
-        name: "Mrs. Sunita Behera",
-        role: "Faculty",
-        subject: "Odia Language",
-        qualification: "M.A. Odia Literature",
-        experience: "10 years",
-        color: "from-amber-500 to-amber-700",
-    },
-    {
-        name: "Mr. Ashish Kumar Sahu",
-        role: "Sports Director",
-        subject: "Physical Education",
-        qualification: "M.P.Ed, Utkal University",
-        experience: "11 years",
-        color: "from-orange-500 to-orange-700",
-    },
-    {
-        name: "Mrs. Ranjita Mishra",
-        role: "Faculty",
-        subject: "Hindi",
-        qualification: "M.A. Hindi, Sambalpur University",
-        experience: "9 years",
-        color: "from-cyan-500 to-cyan-700",
-    },
-    {
-        name: "Dr. Satyabrata Panigrahi",
-        role: "Faculty",
-        subject: "Geography",
-        qualification: "Ph.D. in Geography",
-        experience: "8 years",
-        color: "from-lime-600 to-lime-800",
-    },
-];
+import { FadeIn, StaggerContainer, staggerItem } from "@/components/animations/FadeIn";
+import { listFacultyPublic } from "@/lib/portal/content";
+import type { FacultyMember } from "@/domain/portal/content-types";
 
 export default function FacultyPage() {
+    const [members, setMembers] = useState<FacultyMember[] | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        listFacultyPublic()
+            .then(setMembers)
+            .catch((err) => setError(err instanceof Error ? err.message : "Failed to load faculty"));
+    }, []);
+
     return (
         <>
             {/* Hero */}
@@ -132,64 +45,75 @@ export default function FacultyPage() {
             {/* Faculty Grid */}
             <section className="section-padding bg-white">
                 <div className="container-narrow mx-auto">
-                    <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {facultyMembers.map((member) => (
-                            <motion.div
-                                key={member.name}
-                                variants={staggerItem}
-                                className="group relative p-6 rounded-2xl bg-white border border-gray-100 card-hover overflow-hidden"
-                            >
-                                {/* Top gradient */}
-                                <div
-                                    className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${member.color}`}
-                                />
-
-                                {/* Avatar */}
-                                <div className="flex items-start gap-4 mb-4">
-                                    <div
-                                        className={`w-14 h-14 rounded-xl bg-gradient-to-br ${member.color} flex items-center justify-center shrink-0 shadow-lg`}
-                                    >
-                                        <span className="text-xl font-heading font-bold text-white">
-                                            {member.name
-                                                .split(" ")
-                                                .map((n) => n[0])
-                                                .slice(0, 2)
-                                                .join("")}
-                                        </span>
+                    {error ? (
+                        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                            Could not load faculty. Please refresh.
+                        </div>
+                    ) : members === null ? (
+                        <FacultyGridSkeleton />
+                    ) : members.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-gray-200 p-12 text-center text-muted">
+                            Faculty profiles will appear here soon.
+                        </div>
+                    ) : (
+                        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {members.map((member) => (
+                                <motion.div
+                                    key={member.id}
+                                    variants={staggerItem}
+                                    className="group relative rounded-2xl bg-white border border-gray-100 card-hover overflow-hidden"
+                                >
+                                    {/* Photo or gradient */}
+                                    <div className={`relative aspect-[4/3] w-full ${member.photoUrl ? "" : "bg-gradient-to-br"} ${member.photoUrl ? "" : member.accent}`}>
+                                        {member.photoUrl ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img
+                                                src={member.photoUrl}
+                                                alt={member.name}
+                                                className="h-full w-full object-cover"
+                                                loading="lazy"
+                                            />
+                                        ) : (
+                                            <div className="flex h-full w-full items-center justify-center">
+                                                <span className="text-5xl font-heading font-bold text-white">
+                                                    {member.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${member.accent}`} />
                                     </div>
-                                    <div className="min-w-0">
-                                        <h3 className="text-base font-heading font-bold text-navy-950 truncate">
+
+                                    <div className="p-6">
+                                        <h3 className="text-base font-heading font-bold text-navy-950">
                                             {member.name}
                                         </h3>
-                                        <p className="text-xs text-gold-600 font-medium">
+                                        <p className="mt-1 text-xs text-gold-600 font-medium">
                                             {member.role}
                                         </p>
-                                    </div>
-                                </div>
 
-                                {/* Details */}
-                                <div className="space-y-2 mb-5">
-                                    <div className="flex items-center gap-2">
-                                        <BookOpen className="w-3.5 h-3.5 text-muted shrink-0" />
-                                        <span className="text-xs text-muted">{member.subject}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Mail className="w-3.5 h-3.5 text-muted shrink-0" />
-                                        <span className="text-xs text-muted truncate">
-                                            {member.qualification}
-                                        </span>
-                                    </div>
-                                </div>
+                                        <div className="mt-4 space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <BookOpen className="w-3.5 h-3.5 text-muted shrink-0" />
+                                                <span className="text-xs text-muted">{member.subject}</span>
+                                            </div>
+                                            <div className="flex items-start gap-2">
+                                                <Mail className="w-3.5 h-3.5 text-muted shrink-0 mt-0.5" />
+                                                <span className="text-xs text-muted">
+                                                    {member.qualification}
+                                                </span>
+                                            </div>
+                                        </div>
 
-                                {/* Experience badge */}
-                                <div className="inline-flex items-center px-3 py-1.5 rounded-lg bg-navy-50">
-                                    <span className="text-xs font-semibold text-navy-700">
-                                        {member.experience} experience
-                                    </span>
-                                </div>
-                            </motion.div>
-                        ))}
-                    </StaggerContainer>
+                                        <div className="mt-4 inline-flex items-center px-3 py-1.5 rounded-lg bg-navy-50">
+                                            <span className="text-xs font-semibold text-navy-700">
+                                                {member.experience} experience
+                                            </span>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </StaggerContainer>
+                    )}
                 </div>
             </section>
 
@@ -214,5 +138,21 @@ export default function FacultyPage() {
                 </div>
             </section>
         </>
+    );
+}
+
+function FacultyGridSkeleton() {
+    return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="rounded-2xl border border-gray-100 bg-white overflow-hidden">
+                    <div className="aspect-[4/3] w-full animate-pulse bg-gray-100" />
+                    <div className="p-6 space-y-3">
+                        <div className="h-4 w-2/3 animate-pulse rounded bg-gray-100" />
+                        <div className="h-3 w-1/2 animate-pulse rounded bg-gray-100" />
+                    </div>
+                </div>
+            ))}
+        </div>
     );
 }

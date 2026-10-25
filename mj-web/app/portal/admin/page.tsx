@@ -18,6 +18,18 @@ export default function AdminHome() {
                     accent="from-blue-500 to-indigo-600"
                 />
                 <Shortcut
+                    href="/portal/admin/staff"
+                    title="Staff & Teachers"
+                    desc="Create logins and set which classes and subjects each person teaches."
+                    accent="from-sky-500 to-blue-600"
+                />
+                <Shortcut
+                    href="/portal/admin/classes"
+                    title="Classes & Sections"
+                    desc="Add grades and sections, and choose each section's class teacher."
+                    accent="from-lime-500 to-emerald-600"
+                />
+                <Shortcut
                     href="/portal/students"
                     title="Students"
                     desc="Add, edit, opt-out. See every student in every class."

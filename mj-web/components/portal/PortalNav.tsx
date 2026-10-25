@@ -11,7 +11,7 @@ interface NavItem {
     label: string;
     icon: React.ReactNode;
     roles: UserRole[];
-    section: "primary" | "admin";
+    section: "primary" | "admin" | "content";
 }
 
 // Simple stroke icons — no external deps.
@@ -56,6 +56,21 @@ const Icon = {
             <path d="M3 3v18h18" /><path d="M7 15l4-4 4 4 5-6" />
         </svg>
     ),
+    image: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="M21 15l-5-5L5 21" />
+        </svg>
+    ),
+    userPlus: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" />
+        </svg>
+    ),
+    grid: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+        </svg>
+    ),
 };
 
 const NAV: NavItem[] = [
@@ -67,8 +82,17 @@ const NAV: NavItem[] = [
     { href: "/portal/subjects", label: "Subjects", icon: Icon.book, roles: ["admin", "teacher", "staff"], section: "primary" },
     { href: "/portal/results", label: "Results", icon: Icon.award, roles: ["admin", "teacher", "staff"], section: "primary" },
     { href: "/portal/syllabus", label: "Syllabus", icon: Icon.file, roles: ["admin", "teacher"], section: "primary" },
+    { href: "/portal/admin/staff", label: "Staff & Teachers", icon: Icon.userPlus, roles: ["admin"], section: "admin" },
+    { href: "/portal/admin/classes", label: "Classes & Sections", icon: Icon.grid, roles: ["admin"], section: "admin" },
     { href: "/portal/promotion", label: "Annual Promotion", icon: Icon.stepUp, roles: ["admin"], section: "admin" },
     { href: "/portal/kpis", label: "KPIs & Analytics", icon: Icon.chart, roles: ["admin"], section: "admin" },
+    { href: "/portal/admin/content/home", label: "Home page", icon: Icon.home, roles: ["admin"], section: "content" },
+    { href: "/portal/admin/content/about", label: "About page", icon: Icon.file, roles: ["admin"], section: "content" },
+    { href: "/portal/admin/content/academics", label: "Academics page", icon: Icon.book, roles: ["admin"], section: "content" },
+    { href: "/portal/admin/content/admissions", label: "Admissions page", icon: Icon.stepUp, roles: ["admin"], section: "content" },
+    { href: "/portal/admin/content/faculty", label: "Faculty profiles", icon: Icon.image, roles: ["admin"], section: "content" },
+    { href: "/portal/admin/content/gallery", label: "Gallery", icon: Icon.image, roles: ["admin"], section: "content" },
+    { href: "/portal/admin/content/contact", label: "Contact page", icon: Icon.calendar, roles: ["admin"], section: "content" },
 ];
 
 const ROLE_TONE: Record<UserRole, string> = {
@@ -91,6 +115,7 @@ export function PortalNav() {
     const items = NAV.filter((item) => item.roles.includes(role));
     const primary = items.filter((i) => i.section === "primary");
     const admin = items.filter((i) => i.section === "admin");
+    const content = items.filter((i) => i.section === "content");
 
     const initials = (portalUser?.displayName ?? "?")
         .split(/\s+/)
@@ -168,6 +193,14 @@ export function PortalNav() {
                                 Admin
                             </div>
                             <NavGroup items={admin} pathname={pathname} />
+                        </>
+                    )}
+                    {content.length > 0 && (
+                        <>
+                            <div className="mt-4 mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                                Portfolio Content
+                            </div>
+                            <NavGroup items={content} pathname={pathname} />
                         </>
                     )}
                 </nav>

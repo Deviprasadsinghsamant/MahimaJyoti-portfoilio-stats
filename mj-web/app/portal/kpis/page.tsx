@@ -24,7 +24,7 @@ import {
     listStudents,
     listSubjects,
     listAllResults,
-    listTeachersAndStaff,
+    listStaff,
 } from "@/lib/portal/data";
 import type {
     Result,
@@ -49,7 +49,9 @@ interface Loaded {
     students: Map<string, Student>;
     subjects: Map<string, Subject>;
     results: Result[];
+    // uid → name for every teacher/staff, including deactivated ones whose results remain.
     users: Map<string, string>;
+    activeStaffCount: number;
 }
 
 function KpiView() {
@@ -64,7 +66,7 @@ function KpiView() {
                     listClasses(),
                     listSubjects(),
                     listAllResults(),
-                    listTeachersAndStaff(),
+                    listStaff(),
                 ]);
                 const studentLists = await Promise.all(
                     classes.map((c) => listStudents(c.id, { includeInactive: true }))
@@ -73,7 +75,14 @@ function KpiView() {
                 studentLists.flat().forEach((s) => studentMap.set(s.id, s));
                 const subjectMap = new Map(subjects.map((s) => [s.id, s]));
                 const userMap = new Map(teachers.map((t) => [t.uid, t.displayName]));
-                setData({ classes, students: studentMap, subjects: subjectMap, results, users: userMap });
+                setData({
+                    classes,
+                    students: studentMap,
+                    subjects: subjectMap,
+                    results,
+                    users: userMap,
+                    activeStaffCount: teachers.filter((t) => t.isActive).length,
+                });
             } catch (err) {
                 setError(err instanceof Error ? err.message : "Failed to load KPIs");
             }
@@ -107,7 +116,7 @@ function KpiView() {
                 {/* Hero stat row */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <StatTile tone="brand" label="Active students" value={activeStudents.length} hint={`${data.classes.length} classes`} />
-                    <StatTile label="Teachers & staff" value={data.users.size} hint="on payroll this year" />
+                    <StatTile label="Teachers & staff" value={data.activeStaffCount} hint="active portal accounts" />
                     <StatTile
                         tone={overallAvg >= 70 ? "positive" : overallAvg >= 55 ? "default" : "warning"}
                         label="School average"
@@ -342,7 +351,7 @@ function PerTeacherChart({ data }: { data: Loaded }) {
     const entries = useMemo(() => {
         const buckets = averageBy(data.results, (r) => r.teacherId);
         return Array.from(buckets.entries())
-            .map(([uid, avg]) => ({ label: data.users.get(uid) ?? uid.slice(0, 6), avg }))
+            .map(([uid, avg]) => ({ label: data.users.get(uid) ?? (uid ? uid.slice(0, 6) : "Unassigned"), avg }))
             .sort((a, b) => b.avg - a.avg);
     }, [data]);
 

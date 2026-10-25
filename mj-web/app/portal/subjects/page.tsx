@@ -9,9 +9,10 @@ import {
     listSubjects,
     createSubject,
     deleteSubject,
-    listTeachersAndStaff,
+    setSubjectTeacher,
+    listStaff,
 } from "@/lib/portal/data";
-import type { Subject, UserRole } from "@/domain/portal/types";
+import type { PortalUser, Subject, UserRole } from "@/domain/portal/types";
 
 const ACADEMIC_YEAR = "2025-2026";
 
@@ -29,10 +30,13 @@ function SubjectsView() {
 
     const [classId, setClassId] = useState<string | null>(null);
     const [subjects, setSubjects] = useState<Subject[]>([]);
-    const [teachers, setTeachers] = useState<{ uid: string; displayName: string; role: UserRole }[]>([]);
+    // Every teacher/staff profile, including deactivated ones, for name lookups.
+    const [staff, setStaff] = useState<PortalUser[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showAdd, setShowAdd] = useState(false);
+    const [reassigningId, setReassigningId] = useState<string | null>(null);
+    const isAdmin = role === "admin";
 
     const refresh = useCallback(async () => {
         if (!classId) return;
@@ -54,12 +58,28 @@ function SubjectsView() {
     }, [refresh]);
 
     useEffect(() => {
-        listTeachersAndStaff().then(setTeachers).catch(() => {
+        listStaff().then(setStaff).catch(() => {
             /* teachers list is best-effort */
         });
     }, []);
 
-    const teacherLookup = new Map(teachers.map((t) => [t.uid, t.displayName]));
+    const teachers = staff
+        .filter((u) => u.isActive)
+        .map(({ uid, displayName, role }) => ({ uid, displayName, role }));
+    const teacherLookup = new Map(staff.map((t) => [t.uid, t.isActive ? t.displayName : `${t.displayName} (deactivated)`]));
+
+    async function reassign(subject: Subject, teacherId: string | null) {
+        setReassigningId(subject.id);
+        setError(null);
+        try {
+            await setSubjectTeacher(subject.id, teacherId);
+            await refresh();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Couldn't change the teacher");
+        } finally {
+            setReassigningId(null);
+        }
+    }
 
     return (
         <div>
@@ -115,7 +135,30 @@ function SubjectsView() {
                                         <tr key={s.id} className="border-t border-neutral-100">
                                             <td className="px-4 py-2 font-medium text-neutral-900">{s.name}</td>
                                             <td className="px-4 py-2 text-neutral-700">
-                                                {teacherLookup.get(s.teacherId) ?? s.teacherId.slice(0, 8)}
+                                                {isAdmin ? (
+                                                    <select
+                                                        value={s.teacherId ?? ""}
+                                                        disabled={reassigningId === s.id}
+                                                        onChange={(e) => reassign(s, e.target.value || null)}
+                                                        className="rounded border border-neutral-300 bg-white px-2 py-1 text-sm outline-none focus:border-neutral-900 disabled:opacity-50"
+                                                    >
+                                                        <option value="">— Unassigned —</option>
+                                                        {s.teacherId && !teachers.some((t) => t.uid === s.teacherId) && (
+                                                            <option value={s.teacherId}>
+                                                                {teacherLookup.get(s.teacherId) ?? "Unknown user"}
+                                                            </option>
+                                                        )}
+                                                        {teachers.map((t) => (
+                                                            <option key={t.uid} value={t.uid}>
+                                                                {t.displayName} ({t.role})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                ) : s.teacherId ? (
+                                                    teacherLookup.get(s.teacherId) ?? s.teacherId.slice(0, 8)
+                                                ) : (
+                                                    <span className="text-amber-700">Unassigned</span>
+                                                )}
                                             </td>
                                             <td className="px-4 py-2 text-neutral-700">{s.academicYear}</td>
                                             <td className="px-4 py-2 text-right">
@@ -149,7 +192,9 @@ function SubjectsView() {
                 <AddSubjectDialog
                     classId={classId}
                     teachers={teachers}
-                    defaultTeacherId={firebaseUser?.uid ?? ""}
+                    // Teachers and staff default to themselves. Admins aren't in the
+                    // list, so they start on "no teacher" instead of assigning themselves.
+                    defaultTeacherId={isAdmin ? "" : firebaseUser?.uid ?? ""}
                     onClose={() => setShowAdd(false)}
                     onSaved={() => {
                         setShowAdd(false);
@@ -187,7 +232,7 @@ function AddSubjectDialog({
             await createSubject({
                 name,
                 classId,
-                teacherId: teacherId || defaultTeacherId,
+                teacherId: teacherId || null,
                 academicYear: ACADEMIC_YEAR,
             });
             onSaved();
@@ -228,6 +273,7 @@ function AddSubjectDialog({
                         onChange={(e) => setTeacherId(e.target.value)}
                         className="w-full rounded border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
                     >
+                        <option value="">— No teacher yet —</option>
                         {teachers.map((t) => (
                             <option key={t.uid} value={t.uid}>
                                 {t.displayName} ({t.role})
