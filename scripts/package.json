@@ -6,7 +6,9 @@
     "seed:content": "ts-node seed-content.ts",
     "school:prepare": "ts-node seed-school.ts prepare",
     "school:check": "ts-node seed-school.ts check",
-    "school:apply": "ts-node seed-school.ts apply"
+    "school:apply": "ts-node seed-school.ts apply",
+    "school:sections": "ts-node assign-sections.ts",
+    "school:subjects": "ts-node sync-subjects.ts"
   },
   "dependencies": {
     "firebase-admin": "^12.0.0"

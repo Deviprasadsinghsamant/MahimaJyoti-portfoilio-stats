@@ -78,6 +78,11 @@ export interface SectionDef {
     name: string;
     // null = subject exists for marks but has no teacher.
     subjects: Partial<Record<SubjectCode, TeacherKey | null>>;
+    // VIII–X: the third language is each student's own choice (Sanskrit or
+    // Hindi), so every section offers both. The sheets' single "TLS/H" mark
+    // goes to the language the timetable gives this section unless the
+    // student's choice is known.
+    defaultThirdLanguage?: "TLS" | "TLH";
 }
 
 const CO_CURRICULAR: SectionDef["subjects"] = {
@@ -115,52 +120,55 @@ export const SECTIONS: SectionDef[] = [
             GSC: "subhashree", SSC: "subhashree", ...CO_CURRICULAR,
         },
     },
+    // VIII–X: both third languages in every section (see defaultThirdLanguage).
+    // Where the timetable gives a section only one, the other language's teacher
+    // is the one who teaches it to the same class; Class X has no Hindi teacher.
     {
-        grade: "VIII", section: "A", name: "Class VIII-A",
+        grade: "VIII", section: "A", name: "Class VIII-A", defaultThirdLanguage: "TLS",
         subjects: {
-            FLO: "nibedita", SLE: "pinki", TLS: "debaraj", MTH: "luckys",
+            FLO: "nibedita", SLE: "pinki", TLS: "debaraj", TLH: "krishna", MTH: "luckys",
             GSC: "luckys", SSC: "tuna", ...CO_CURRICULAR,
         },
     },
     {
-        grade: "VIII", section: "B", name: "Class VIII-B",
+        grade: "VIII", section: "B", name: "Class VIII-B", defaultThirdLanguage: "TLH",
         subjects: {
-            FLO: "nibedita", SLE: "pinki", TLH: "krishna", MTH: "chinmaya",
+            FLO: "nibedita", SLE: "pinki", TLS: "debaraj", TLH: "krishna", MTH: "chinmaya",
             GSC: "luckys", SSC: "biswajit", ...CO_CURRICULAR,
         },
     },
     {
-        grade: "IX", section: "A", name: "Class IX-A",
+        grade: "IX", section: "A", name: "Class IX-A", defaultThirdLanguage: "TLS",
         subjects: {
             FLO: "biswajit", SLE: "ganesh", TLS: "debaraj", TLH: "krishna", MTH: "chinmaya",
             SCP: "luckys", SCL: "suvendu", SSH: "subhashree", SSG: "tuna", ...COMBINED_IX_X,
         },
     },
     {
-        grade: "IX", section: "B", name: "Class IX-B",
+        grade: "IX", section: "B", name: "Class IX-B", defaultThirdLanguage: "TLS",
         subjects: {
-            FLO: "mamata", SLE: "ganesh", TLS: "debaraj", MTH: "chinmaya",
+            FLO: "mamata", SLE: "ganesh", TLS: "debaraj", TLH: "krishna", MTH: "chinmaya",
             SCP: "chinmaya", SCL: "suvendu", SSH: "subhashree", SSG: "tuna", ...COMBINED_IX_X,
         },
     },
     {
-        grade: "IX", section: "C", name: "Class IX-C",
+        grade: "IX", section: "C", name: "Class IX-C", defaultThirdLanguage: "TLH",
         subjects: {
-            FLO: "mamata", SLE: "ganesh", TLH: "krishna", MTH: "pradeep",
+            FLO: "mamata", SLE: "ganesh", TLS: "debaraj", TLH: "krishna", MTH: "pradeep",
             SCP: "luckys", SCL: "suvendu", SSH: "subhashree", SSG: "tuna", ...COMBINED_IX_X,
         },
     },
     {
-        grade: "X", section: "A", name: "Class X-A",
+        grade: "X", section: "A", name: "Class X-A", defaultThirdLanguage: "TLS",
         subjects: {
-            FLO: "biswajit", SLE: "ganesh", TLS: "biswajit", MTH: "chinmaya",
+            FLO: "biswajit", SLE: "ganesh", TLS: "biswajit", TLH: null, MTH: "chinmaya",
             SCP: "subhashree", SCL: "pradeep", SSH: "subhashree", SSG: "tuna", ...COMBINED_IX_X,
         },
     },
     {
-        grade: "X", section: "B", name: "Class X-B",
+        grade: "X", section: "B", name: "Class X-B", defaultThirdLanguage: "TLS",
         subjects: {
-            FLO: "biswajit", SLE: "ganesh", TLS: "biswajit", MTH: "pradeep",
+            FLO: "biswajit", SLE: "ganesh", TLS: "biswajit", TLH: null, MTH: "pradeep",
             SCP: "subhashree", SCL: "pradeep", SSH: "subhashree", SSG: "tuna", ...COMBINED_IX_X,
         },
     },

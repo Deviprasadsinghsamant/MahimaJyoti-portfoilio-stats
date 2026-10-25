@@ -71,13 +71,15 @@ function sectionLabel(s: SectionDef) {
     return s.name.replace(/^Class /, "");
 }
 
-// The third language a VIII–X student's single "TLS/H" mark belongs to.
+// The third language a VIII–X student's single "TLS/H" mark belongs to: their
+// own choice when the section sheet gives it, else the section's default.
 function thirdLanguageOf(entry: RosterEntry, section: SectionDef): SubjectCode | null {
     const offered = (["TLS", "TLH"] as SubjectCode[]).filter((c) => c in section.subjects);
     if (entry.thirdLanguage) {
         const code: SubjectCode = entry.thirdLanguage === "Sanskrit" ? "TLS" : "TLH";
         return offered.includes(code) ? code : null;
     }
+    if (section.defaultThirdLanguage) return section.defaultThirdLanguage;
     return offered.length === 1 ? offered[0] : null;
 }
 

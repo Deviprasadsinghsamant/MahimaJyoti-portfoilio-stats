@@ -42,5 +42,35 @@ Steps:
 
 Re-running `apply` starts over from the same inputs.
 
+## Put students into their sections
+
+`assign-sections.ts` moves students to the sections in the school's list, without
+touching anything else (teachers, logins, other students). Save the list as
+`data/sections.xlsx`: a sheet named **NAME & SECTION** with one table per class
+side by side — a `CLASS - VIII` title over `NAME OF STUDENT` and `SECTION` columns.
+
+1. `npm run school:sections` — dry run: matches every name (using all the spellings
+   from the import), shows section sizes before → after, and lists students who
+   aren't in the list (they stay where they are).
+2. `npm run school:sections -- --yes` — backs up the affected students and marks
+   to `data/backups/`, then moves them.
+
+A moved student's marks move to the new section's subject of the same name.
+
+## Third language (VIII–X)
+
+Sanskrit or Hindi is each student's own choice, so every VIII–X section has both
+subjects. The result sheets record one "TLS/H" mark without saying which, so the
+import puts it under the language the timetable gives the section (VIII-B and
+IX-C: Hindi; other sections: Sanskrit), or the student's choice if the section
+sheet's **Third language** column has it. To switch a student, use **Move** on
+the Students page, keep the same section, and map Sanskrit → Hindi.
+
+## Keep subjects in step with the timetable
+
+`npm run school:subjects` lists subjects in `school/timetable.ts` that a class in
+Firestore doesn't have yet; add `-- --yes` to create them with their timetable
+teacher. It never changes or removes existing subjects.
+
 Full marks follow the school's marking scheme (see `maxMarks` in
 `school/workbooks.ts`). Absent marks are skipped, not stored as zero.
