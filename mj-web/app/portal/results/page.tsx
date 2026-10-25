@@ -10,6 +10,7 @@ import {
     listResults,
     upsertResult,
 } from "@/lib/portal/data";
+import { EXAM_TYPES, currentAcademicYear } from "@/lib/portal/academic";
 import type {
     ExamType,
     Result,
@@ -17,12 +18,13 @@ import type {
     Subject,
 } from "@/domain/portal/types";
 
-const ACADEMIC_YEAR = "2025-2026";
-const EXAM_TYPES: { value: ExamType; label: string; defaultTotal: number }[] = [
-    { value: "unit-test", label: "Unit Test", defaultTotal: 25 },
-    { value: "midterm", label: "Midterm", defaultTotal: 100 },
-    { value: "final", label: "Final", defaultTotal: 100 },
-];
+// Max marks offered when a sitting has no results yet. Classes IX–X use 50
+// for Internal Assessments and 100 for Summatives; change "Total" there.
+const DEFAULT_TOTALS: Record<ExamType, number> = {
+    baseline: 25,
+    "internal-assessment": 25,
+    summative: 50,
+};
 
 export default function ResultsPage() {
     return (
@@ -38,7 +40,7 @@ function ResultsView() {
 
     const [classId, setClassId] = useState<string | null>(null);
     const [subjectId, setSubjectId] = useState<string | null>(null);
-    const [examType, setExamType] = useState<ExamType>("unit-test");
+    const [examType, setExamType] = useState<ExamType>("internal-assessment");
     const [examNumber, setExamNumber] = useState<number>(1);
     const [examDate, setExamDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
     const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -82,7 +84,7 @@ function ResultsView() {
                 (r) =>
                     r.examType === examType &&
                     r.examNumber === examNumber &&
-                    r.academicYear === ACADEMIC_YEAR
+                    r.academicYear === currentAcademicYear()
             );
             const marksMap: Record<string, string> = {};
             filtered.forEach((r) => (marksMap[r.studentId] = String(r.marksObtained)));
@@ -91,7 +93,7 @@ function ResultsView() {
                 setTotalMarks(filtered[0].totalMarks);
                 if (filtered[0].examDate) setExamDate(filtered[0].examDate);
             } else {
-                setTotalMarks(EXAM_TYPES.find((e) => e.value === examType)!.defaultTotal);
+                setTotalMarks(DEFAULT_TOTALS[examType]);
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to load results");
@@ -132,7 +134,7 @@ function ResultsView() {
                     examDate,
                     marksObtained: n,
                     totalMarks,
-                    academicYear: ACADEMIC_YEAR,
+                    academicYear: currentAcademicYear(),
                     // "" when the subject has no teacher; KPIs show these as "Unassigned".
                     teacherId: currentSubject.teacherId ?? "",
                     uploadedBy: firebaseUser.uid,

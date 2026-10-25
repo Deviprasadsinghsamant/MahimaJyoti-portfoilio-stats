@@ -4,4 +4,4 @@
 export type UserRole = "admin" | "teacher" | "staff";
 export type Gender = "male" | "female" | "other";
 export type AttendanceStatus = "present" | "absent";
-export type ExamType = "unit-test" | "midterm" | "final";
+export type ExamType = "baseline" | "internal-assessment" | "summative";

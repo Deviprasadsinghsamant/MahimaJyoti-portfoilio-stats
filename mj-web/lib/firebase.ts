@@ -5,7 +5,7 @@
 
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
-import { getFunctions, type Functions } from "firebase/functions";
+import { connectFunctionsEmulator, getFunctions, type Functions } from "firebase/functions";
 import {
     initializeFirestore,
     persistentLocalCache,
@@ -67,6 +67,14 @@ export function getFirebaseDb(): Firestore {
 export function getFirebaseFunctions(): Functions {
     if (!functions) {
         functions = getFunctions(getFirebaseApp(), FUNCTIONS_REGION);
+        // Local development only: set NEXT_PUBLIC_FUNCTIONS_EMULATOR=localhost:5001 in
+        // .env.development.local (never loaded by `next build`) to call functions running in
+        // `firebase emulators:start --only functions`. Firestore and Auth stay on the real project.
+        const emulator = process.env.NEXT_PUBLIC_FUNCTIONS_EMULATOR;
+        if (emulator) {
+            const [host, port] = emulator.split(":");
+            connectFunctionsEmulator(functions, host, Number(port));
+        }
     }
     return functions;
 }

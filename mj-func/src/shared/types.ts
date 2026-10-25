@@ -31,7 +31,8 @@ export interface Student {
     id: string;
     name: string;
     parentName: string;
-    gender: Gender;
+    // null when not recorded (e.g. students imported from result sheets).
+    gender: Gender | null;
     rollNo: string | null;
     contactNumber: string;
     classId: string;
@@ -66,7 +67,7 @@ export interface Attendance {
     createdAt: number;
 }
 
-export type ExamType = "unit-test" | "midterm" | "final";
+export type ExamType = "baseline" | "internal-assessment" | "summative";
 
 export interface Result {
     id: string;

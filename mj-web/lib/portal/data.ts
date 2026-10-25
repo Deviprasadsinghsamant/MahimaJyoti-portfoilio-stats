@@ -117,6 +117,56 @@ export async function setStudentActive(id: string, isActive: boolean) {
     });
 }
 
+/**
+ * Move a student to another section (or keep the section and change subjects),
+ * taking their marks along. Every result recorded in the student's current
+ * class is re-pointed at `subjectMap[result.subjectId]` in `toClassId` — e.g.
+ * IX-A Odia → IX-C Odia, or IX-A Sanskrit → IX-C Hindi. Results from earlier
+ * classes (previous years) stay where they are, as does past attendance.
+ * Returns how many results moved.
+ */
+export async function moveStudent(
+    student: Student,
+    toClassId: string,
+    subjectMap: Record<string, Subject>,
+    actingUid: string
+): Promise<number> {
+    return withTokenRetry(async () => {
+        const database = db();
+        const snap = await getDocs(
+            query(
+                collection(database, "results"),
+                where("studentId", "==", student.id),
+                where("classId", "==", student.classId)
+            )
+        );
+        const batch = writeBatch(database);
+        if (toClassId !== student.classId) {
+            batch.update(doc(database, "students", student.id), { classId: toClassId });
+        }
+        let moved = 0;
+        for (const d of snap.docs) {
+            const r = d.data() as Result;
+            const target = subjectMap[r.subjectId];
+            if (!target) throw new Error(`${student.name}: no subject chosen for some of their marks.`);
+            if (target.id === r.subjectId && toClassId === r.classId) continue;
+            const patch: Partial<Result> = {
+                classId: toClassId,
+                subjectId: target.id,
+                teacherId: target.teacherId ?? "",
+            };
+            // Marks the old subject teacher owned become the new subject teacher's to edit.
+            if (r.uploadedBy === r.teacherId) patch.uploadedBy = target.teacherId ?? actingUid;
+            batch.update(d.ref, patch);
+            moved++;
+        }
+        await batch.commit();
+        invalidate("students:");
+        invalidate("results:");
+        return moved;
+    });
+}
+
 // Subjects ────────────────────────────────────────
 export async function listSubjects(classId?: string): Promise<Subject[]> {
     const key = `subjects:${classId ?? "all"}`;

@@ -35,5 +35,14 @@
     "frameworksBackend": {
       "region": "us-central1"
     }
+  },
+  "emulators": {
+    "functions": {
+      "port": 5001
+    },
+    "ui": {
+      "enabled": false
+    },
+    "singleProjectMode": true
   }
 }

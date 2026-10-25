@@ -26,6 +26,7 @@ import {
     listAllResults,
     listStaff,
 } from "@/lib/portal/data";
+import { EXAM_TYPES as EXAM_TYPE_OPTIONS, examLabel } from "@/lib/portal/academic";
 import type {
     Result,
     SchoolClass,
@@ -34,7 +35,7 @@ import type {
     ExamType,
 } from "@/domain/portal/types";
 
-const EXAM_TYPES: ExamType[] = ["unit-test", "midterm", "final"];
+const EXAM_TYPES: ExamType[] = EXAM_TYPE_OPTIONS.map((e) => e.value);
 
 export default function KpiPage() {
     return (
@@ -771,7 +772,7 @@ function StudentTrendCard({ data }: { data: Loaded }) {
         const subjectIds = Array.from(new Set(rs.map((r) => r.subjectId)));
 
         // Track sitting counts per (exam type) for the axis label / subtitle.
-        const sittingCounts: Record<ExamType, number> = { "unit-test": 0, midterm: 0, final: 0 };
+        const sittingCounts: Record<ExamType, number> = { baseline: 0, "internal-assessment": 0, summative: 0 };
         for (const et of EXAM_TYPES) {
             sittingCounts[et] = new Set(
                 rs.filter((r) => r.examType === et).map((r) => `${r.examDate}#${r.examNumber}`)
@@ -888,7 +889,7 @@ function StudentProgressCard({ data }: { data: Loaded }) {
         [activeStudents, classFilterId]
     );
     const [studentId, setStudentId] = useState(studentsInClass[0]?.id ?? "");
-    const [examType, setExamType] = useState<ExamType>("unit-test");
+    const [examType, setExamType] = useState<ExamType>("internal-assessment");
 
     // Reset selected student when class changes and the current pick isn't in it.
     useEffect(() => {
@@ -1081,11 +1082,7 @@ function EmptyBody({ children }: { children: React.ReactNode }) {
 }
 
 function labelForExam(e: ExamType) {
-    switch (e) {
-        case "unit-test": return "Unit Test";
-        case "midterm": return "Midterm";
-        case "final": return "Final";
-    }
+    return examLabel(e);
 }
 
 // ── results matrix ─────────────────────────────────

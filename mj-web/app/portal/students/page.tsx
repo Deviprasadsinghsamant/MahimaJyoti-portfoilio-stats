@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { RoleGate } from "@/components/portal/RoleGate";
 import { PageHeader } from "@/components/portal/PageHeader";
 import { ClassSelector } from "@/components/portal/ClassSelector";
@@ -9,10 +9,14 @@ import {
     listStudents,
     createStudent,
     setStudentActive,
+    listClasses,
+    listSubjects,
+    listResults,
+    moveStudent,
+    sortClasses,
 } from "@/lib/portal/data";
-import type { Gender, Student } from "@/domain/portal/types";
-
-const ACADEMIC_YEAR = "2025-2026";
+import { currentAcademicYear } from "@/lib/portal/academic";
+import type { Gender, SchoolClass, Student, Subject } from "@/domain/portal/types";
 
 export default function StudentsPage() {
     return (
@@ -31,12 +35,17 @@ function StudentsView() {
     const [students, setStudents] = useState<Student[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [message, setMessage] = useState<string | null>(null);
     const [showAdd, setShowAdd] = useState(false);
+    // Admin: students ticked for moving, and the ones the move dialog is open for.
+    const [selected, setSelected] = useState<Set<string>>(new Set());
+    const [moving, setMoving] = useState<Student[] | null>(null);
 
     const refresh = useCallback(async () => {
         if (!classId) return;
         setLoading(true);
         setError(null);
+        setSelected(new Set());
         try {
             const list = await listStudents(classId, { includeInactive: showInactive });
             list.sort((a, b) => (a.rollNo ?? "").localeCompare(b.rollNo ?? "") || a.name.localeCompare(b.name));
@@ -51,6 +60,17 @@ function StudentsView() {
     useEffect(() => {
         refresh();
     }, [refresh]);
+
+    const allSelected = students.length > 0 && students.every((s) => selected.has(s.id));
+
+    function toggleSelected(id: string) {
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }
 
     return (
         <div>
@@ -90,6 +110,26 @@ function StudentsView() {
                         {error}
                     </div>
                 )}
+                {message && (
+                    <div className="mb-4 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                        {message}
+                    </div>
+                )}
+
+                {isAdmin && selected.size > 0 && (
+                    <div className="mb-3 flex flex-wrap items-center gap-3 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                        <span>{selected.size} selected</span>
+                        <button
+                            onClick={() => setMoving(students.filter((s) => selected.has(s.id)))}
+                            className="rounded bg-neutral-900 px-3 py-1 text-xs font-medium text-white hover:bg-neutral-800"
+                        >
+                            Move to section…
+                        </button>
+                        <button onClick={() => setSelected(new Set())} className="text-xs underline">
+                            Clear
+                        </button>
+                    </div>
+                )}
 
                 {loading ? (
                     <div className="text-sm text-neutral-500">Loading…</div>
@@ -102,6 +142,18 @@ function StudentsView() {
                         <table className="min-w-full text-sm">
                             <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500">
                                 <tr>
+                                    {isAdmin && (
+                                        <th className="w-8 px-4 py-3">
+                                            <input
+                                                type="checkbox"
+                                                aria-label="Select all students"
+                                                checked={allSelected}
+                                                onChange={() =>
+                                                    setSelected(allSelected ? new Set() : new Set(students.map((s) => s.id)))
+                                                }
+                                            />
+                                        </th>
+                                    )}
                                     <th className="px-4 py-3">Roll</th>
                                     <th className="px-4 py-3">Name</th>
                                     <th className="px-4 py-3">Parent</th>
@@ -114,10 +166,20 @@ function StudentsView() {
                             <tbody>
                                 {students.map((s) => (
                                     <tr key={s.id} className="border-t border-neutral-100">
+                                        {isAdmin && (
+                                            <td className="px-4 py-2">
+                                                <input
+                                                    type="checkbox"
+                                                    aria-label={`Select ${s.name}`}
+                                                    checked={selected.has(s.id)}
+                                                    onChange={() => toggleSelected(s.id)}
+                                                />
+                                            </td>
+                                        )}
                                         <td className="px-4 py-2 text-neutral-700">{s.rollNo ?? "—"}</td>
                                         <td className="px-4 py-2 font-medium text-neutral-900">{s.name}</td>
-                                        <td className="px-4 py-2 text-neutral-700">{s.parentName}</td>
-                                        <td className="px-4 py-2 text-neutral-700 capitalize">{s.gender}</td>
+                                        <td className="px-4 py-2 text-neutral-700">{s.parentName || "—"}</td>
+                                        <td className="px-4 py-2 text-neutral-700 capitalize">{s.gender ?? "—"}</td>
                                         <td className="px-4 py-2 text-neutral-700">{s.contactNumber}</td>
                                         <td className="px-4 py-2">
                                             {s.isActive ? (
@@ -127,13 +189,19 @@ function StudentsView() {
                                             )}
                                         </td>
                                         {isAdmin && (
-                                            <td className="px-4 py-2 text-right">
+                                            <td className="whitespace-nowrap px-4 py-2 text-right">
+                                                <button
+                                                    onClick={() => setMoving([s])}
+                                                    className="text-xs text-neutral-700 underline hover:text-neutral-900"
+                                                >
+                                                    Move
+                                                </button>
                                                 <button
                                                     onClick={async () => {
                                                         await setStudentActive(s.id, !s.isActive);
                                                         refresh();
                                                     }}
-                                                    className="text-xs text-neutral-700 underline hover:text-neutral-900"
+                                                    className="ml-3 text-xs text-neutral-700 underline hover:text-neutral-900"
                                                 >
                                                     {s.isActive ? "Opt-out" : "Re-enroll"}
                                                 </button>
@@ -157,6 +225,246 @@ function StudentsView() {
                     }}
                 />
             )}
+
+            {moving && classId && (
+                <MoveStudentsDialog
+                    students={moving}
+                    fromClassId={classId}
+                    onClose={() => {
+                        setMoving(null);
+                        refresh();
+                    }}
+                    onMoved={(text) => {
+                        setMoving(null);
+                        setMessage(text);
+                        refresh();
+                    }}
+                />
+            )}
+        </div>
+    );
+}
+
+/**
+ * Move students to another section, or keep the section and switch a subject
+ * (e.g. Sanskrit → Hindi). Their marks in the current class go with them: each
+ * subject they have marks in is mapped to a subject of the target class.
+ */
+function MoveStudentsDialog({
+    students,
+    fromClassId,
+    onClose,
+    onMoved,
+}: {
+    students: Student[];
+    fromClassId: string;
+    onClose: () => void;
+    onMoved: (message: string) => void;
+}) {
+    const { firebaseUser } = useAuth();
+    const [classes, setClasses] = useState<SchoolClass[]>([]);
+    const [fromSubjects, setFromSubjects] = useState<Subject[]>([]);
+    // Subjects (in the current class) the chosen students have marks in, with how many marks.
+    const [markCounts, setMarkCounts] = useState<Map<string, number>>(new Map());
+    const [toClassId, setToClassId] = useState("");
+    const [toSubjects, setToSubjects] = useState<Subject[]>([]);
+    const [mapping, setMapping] = useState<Record<string, string>>({});
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [progress, setProgress] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const [all, subjects, results] = await Promise.all([
+                    listClasses(),
+                    listSubjects(fromClassId),
+                    listResults({ classId: fromClassId }),
+                ]);
+                const ids = new Set(students.map((s) => s.id));
+                const counts = new Map<string, number>();
+                for (const r of results) {
+                    if (ids.has(r.studentId)) counts.set(r.subjectId, (counts.get(r.subjectId) ?? 0) + 1);
+                }
+                const sorted = sortClasses(all);
+                const from = sorted.find((c) => c.id === fromClassId);
+                // Default to the next section of the same grade, if there is one.
+                const sameGrade = sorted.filter((c) => c.grade === from?.grade);
+                const next = sameGrade[sameGrade.findIndex((c) => c.id === fromClassId) + 1] ?? sameGrade[0] ?? from;
+                setClasses(sorted);
+                setFromSubjects(subjects);
+                setMarkCounts(counts);
+                setToClassId(next?.id ?? fromClassId);
+            } catch (err) {
+                setError(err instanceof Error ? err.message : "Failed to load");
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, [fromClassId, students]);
+
+    // When the target changes, pre-pick the same-named subject for each subject with marks.
+    useEffect(() => {
+        if (!toClassId) return;
+        let cancelled = false;
+        listSubjects(toClassId).then((subjects) => {
+            if (cancelled) return;
+            const sorted = [...subjects].sort((a, b) => a.name.localeCompare(b.name));
+            setToSubjects(sorted);
+            const next: Record<string, string> = {};
+            for (const s of fromSubjects) {
+                const same = sorted.find((t) => t.name.trim().toLowerCase() === s.name.trim().toLowerCase());
+                if (same) next[s.id] = same.id;
+            }
+            setMapping(next);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [toClassId, fromSubjects]);
+
+    const withMarks = useMemo(
+        () => fromSubjects.filter((s) => markCounts.has(s.id)).sort((a, b) => a.name.localeCompare(b.name)),
+        [fromSubjects, markCounts]
+    );
+    const unmapped = withMarks.filter((s) => !mapping[s.id]);
+    const sameClass = toClassId === fromClassId;
+    const changesSomething = !sameClass || withMarks.some((s) => mapping[s.id] !== s.id);
+    const fromName = classes.find((c) => c.id === fromClassId)?.name ?? "";
+    const toName = classes.find((c) => c.id === toClassId)?.name ?? "";
+
+    async function handleMove() {
+        if (!firebaseUser || unmapped.length > 0) return;
+        // Every subject with a target, not only those listed — marks added since
+        // the dialog opened still have somewhere to go.
+        const subjectMap: Record<string, Subject> = {};
+        for (const s of fromSubjects) {
+            const target = toSubjects.find((t) => t.id === mapping[s.id]);
+            if (target) subjectMap[s.id] = target;
+        }
+        setSaving(true);
+        setError(null);
+        let moved = 0;
+        let marks = 0;
+        try {
+            // One batch per student, so a failure part-way leaves every student whole.
+            for (const s of students) {
+                setProgress(`Moving ${moved + 1} of ${students.length}…`);
+                marks += await moveStudent(s, toClassId, subjectMap, firebaseUser.uid);
+                moved++;
+            }
+            const who = students.length === 1 ? students[0].name : `${students.length} students`;
+            onMoved(
+                sameClass
+                    ? `Updated subjects for ${who} (${marks} marks).`
+                    : `Moved ${who} to ${toName}, with ${marks} marks.`
+            );
+        } catch (err) {
+            setError(
+                `${moved} of ${students.length} moved before an error: ` +
+                    (err instanceof Error ? err.message : "Move failed")
+            );
+            setSaving(false);
+            setProgress(null);
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
+            <div className="my-8 w-full max-w-lg space-y-4 rounded-lg bg-white p-6 shadow-xl">
+                <div>
+                    <h2 className="text-base font-semibold text-neutral-900">
+                        Move {students.length === 1 ? students[0].name : `${students.length} students`}
+                    </h2>
+                    <p className="mt-1 text-xs text-neutral-500">
+                        Their marks in {fromName || "this class"} move with them. Past attendance stays with the old section.
+                    </p>
+                </div>
+
+                {error && (
+                    <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{error}</div>
+                )}
+
+                {loading ? (
+                    <div className="text-sm text-neutral-500">Loading…</div>
+                ) : (
+                    <>
+                        <label className="block text-sm">
+                            <span className="mb-1 block text-neutral-700">Move to</span>
+                            <select
+                                value={toClassId}
+                                onChange={(e) => setToClassId(e.target.value)}
+                                disabled={saving}
+                                className={inputCls}
+                            >
+                                {classes.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.name}
+                                        {c.id === fromClassId ? " (current — change subjects only)" : ""}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+
+                        {withMarks.length === 0 ? (
+                            <p className="text-xs text-neutral-500">No marks recorded in {fromName} yet — only the section changes.</p>
+                        ) : (
+                            <div>
+                                <div className="mb-1 text-sm text-neutral-700">Their marks go to</div>
+                                <p className="mb-2 text-xs text-neutral-500">
+                                    {sameClass
+                                        ? "Same section: pick a different subject to switch marks, e.g. Sanskrit → Hindi."
+                                        : `Matched by name. Pick a subject where ${toName} doesn't have the same one, e.g. Sanskrit → Hindi.`}
+                                </p>
+                                <div className="divide-y divide-neutral-100 rounded border border-neutral-200">
+                                    {withMarks.map((s) => (
+                                        <div key={s.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                                            <span className="text-neutral-900">
+                                                {s.name}{" "}
+                                                <span className="text-xs text-neutral-500">({markCounts.get(s.id)} marks)</span>
+                                            </span>
+                                            <select
+                                                value={mapping[s.id] ?? ""}
+                                                onChange={(e) => setMapping((m) => ({ ...m, [s.id]: e.target.value }))}
+                                                disabled={saving}
+                                                className={
+                                                    "w-44 rounded border px-2 py-1 text-sm outline-none focus:border-neutral-900 " +
+                                                    (mapping[s.id] ? "border-neutral-300" : "border-amber-400 bg-amber-50")
+                                                }
+                                            >
+                                                <option value="">Choose subject…</option>
+                                                {toSubjects.map((t) => (
+                                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                    {progress && <span className="mr-auto text-xs text-neutral-500">{progress}</span>}
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={saving}
+                        className="rounded px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleMove}
+                        disabled={loading || saving || unmapped.length > 0 || !changesSomething}
+                        className="rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+                    >
+                        {saving ? "Moving…" : sameClass ? "Update subjects" : "Move"}
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
@@ -190,7 +498,7 @@ function AddStudentDialog({
                 rollNo: rollNo.trim() ? rollNo.trim() : null,
                 contactNumber,
                 classId,
-                admissionYear: ACADEMIC_YEAR,
+                admissionYear: currentAcademicYear(),
             });
             onSaved();
         } catch (err) {

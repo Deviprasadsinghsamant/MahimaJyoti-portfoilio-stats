@@ -1,6 +1,6 @@
 // Faculty Domain — Cloud Function Handlers
 
-import * as functions from "firebase-functions";
+import * as functions from "firebase-functions/v1";
 import cors from "cors";
 import { getDoc, getDocs } from "../../shared/firestore";
 

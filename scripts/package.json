@@ -3,15 +3,18 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "seed": "ts-node seed.ts",
-    "seed:content": "ts-node seed-content.ts"
+    "seed:content": "ts-node seed-content.ts",
+    "school:prepare": "ts-node seed-school.ts prepare",
+    "school:check": "ts-node seed-school.ts check",
+    "school:apply": "ts-node seed-school.ts apply"
   },
   "dependencies": {
     "firebase-admin": "^12.0.0"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
+    "exceljs": "^4.4.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.0",
-    "@types/node": "^20.0.0"
+    "typescript": "^5.4.0"
   }
 }

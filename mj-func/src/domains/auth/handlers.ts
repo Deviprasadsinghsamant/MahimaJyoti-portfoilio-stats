@@ -2,7 +2,7 @@
 // ──────────────────────────────────────
 // Admin-only functions for managing user roles.
 
-import * as functions from "firebase-functions";
+import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import cors from "cors";
 

@@ -12,9 +12,9 @@ import {
     setSubjectTeacher,
     listStaff,
 } from "@/lib/portal/data";
+import { currentAcademicYear } from "@/lib/portal/academic";
 import type { PortalUser, Subject, UserRole } from "@/domain/portal/types";
 
-const ACADEMIC_YEAR = "2025-2026";
 
 export default function SubjectsPage() {
     return (
@@ -233,7 +233,7 @@ function AddSubjectDialog({
                 name,
                 classId,
                 teacherId: teacherId || null,
-                academicYear: ACADEMIC_YEAR,
+                academicYear: currentAcademicYear(),
             });
             onSaved();
         } catch (err) {

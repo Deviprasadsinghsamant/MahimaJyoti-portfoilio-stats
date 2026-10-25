@@ -12,7 +12,7 @@ export default function TeacherHome() {
             />
             <div className="grid gap-4 p-4 md:grid-cols-2 md:p-8">
                 <Shortcut href="/portal/attendance" title="Mark attendance" desc="Roster with one-tap present/absent toggles." />
-                <Shortcut href="/portal/results" title="Enter results" desc="Marks per student for unit test, midterm, or final." />
+                <Shortcut href="/portal/results" title="Enter results" desc="Marks per student for baseline, internal, and summative assessments." />
                 <Shortcut href="/portal/syllabus" title="Upload syllabus" desc="Course timeline and weekly plan per subject." />
                 <Shortcut href="/portal/subjects" title="Manage subjects" desc="Add subjects you teach. Delete only your own." />
             </div>
