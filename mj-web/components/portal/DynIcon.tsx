@@ -1,5 +1,6 @@
 "use client";
 
+import { createElement } from "react";
 import { getIcon } from "@/lib/portal/iconRegistry";
 
 /**
@@ -16,7 +17,8 @@ export function DynIcon({
     className?: string;
     fallback?: React.ReactNode;
 }) {
-    const Icon = getIcon(name);
-    if (!Icon) return <>{fallback}</>;
-    return <Icon className={className} />;
+    const icon = getIcon(name);
+    if (!icon) return <>{fallback}</>;
+    // createElement: the icon is a fixed component from the registry, picked by name.
+    return createElement(icon, { className });
 }

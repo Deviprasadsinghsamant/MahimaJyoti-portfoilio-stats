@@ -8,6 +8,7 @@ import type { ChartOptions } from "chart.js";
 import { RoleGate } from "@/components/portal/RoleGate";
 import { PageHeader } from "@/components/portal/PageHeader";
 import { ClassSelector } from "@/components/portal/ClassSelector";
+import { ExportButton } from "@/components/portal/ExportButton";
 import { Card } from "@/components/portal/ui/Card";
 import { StatTile } from "@/components/portal/ui/StatTile";
 import { Badge } from "@/components/portal/ui/Badge";
@@ -27,6 +28,7 @@ import {
     listStaff,
 } from "@/lib/portal/data";
 import { EXAM_TYPES as EXAM_TYPE_OPTIONS, examLabel } from "@/lib/portal/academic";
+import { classResultBook, exportWorkbook, fileSlug } from "@/lib/portal/exportExcel";
 import type {
     Result,
     SchoolClass,
@@ -50,45 +52,70 @@ interface Loaded {
     students: Map<string, Student>;
     subjects: Map<string, Subject>;
     results: Result[];
+    // When `results` was last downloaded; it's reused from the browser's cache for up to a day.
+    resultsFetchedAt: number;
     // uid → name for every teacher/staff, including deactivated ones whose results remain.
     users: Map<string, string>;
     activeStaffCount: number;
+}
+
+// fresh: download every result again instead of using the browser's copy.
+async function loadKpiData(fresh: boolean): Promise<Loaded> {
+    const [classes, subjects, { results, fetchedAt }, teachers] = await Promise.all([
+        listClasses(),
+        listSubjects(),
+        listAllResults({ fresh }),
+        listStaff(),
+    ]);
+    const studentLists = await Promise.all(
+        classes.map((c) => listStudents(c.id, { includeInactive: true }))
+    );
+    const studentMap = new Map<string, Student>();
+    studentLists.flat().forEach((s) => studentMap.set(s.id, s));
+    const subjectMap = new Map(subjects.map((s) => [s.id, s]));
+    const userMap = new Map(teachers.map((t) => [t.uid, t.displayName]));
+    return {
+        classes,
+        students: studentMap,
+        subjects: subjectMap,
+        results,
+        resultsFetchedAt: fetchedAt,
+        users: userMap,
+        activeStaffCount: teachers.filter((t) => t.isActive).length,
+    };
+}
+
+function loadError(err: unknown): string {
+    return err instanceof Error ? err.message : "Failed to load KPIs";
 }
 
 function KpiView() {
     const [data, setData] = useState<Loaded | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [matrixClassId, setMatrixClassId] = useState<string | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
 
     useEffect(() => {
-        (async () => {
-            try {
-                const [classes, subjects, results, teachers] = await Promise.all([
-                    listClasses(),
-                    listSubjects(),
-                    listAllResults(),
-                    listStaff(),
-                ]);
-                const studentLists = await Promise.all(
-                    classes.map((c) => listStudents(c.id, { includeInactive: true }))
-                );
-                const studentMap = new Map<string, Student>();
-                studentLists.flat().forEach((s) => studentMap.set(s.id, s));
-                const subjectMap = new Map(subjects.map((s) => [s.id, s]));
-                const userMap = new Map(teachers.map((t) => [t.uid, t.displayName]));
-                setData({
-                    classes,
-                    students: studentMap,
-                    subjects: subjectMap,
-                    results,
-                    users: userMap,
-                    activeStaffCount: teachers.filter((t) => t.isActive).length,
-                });
-            } catch (err) {
-                setError(err instanceof Error ? err.message : "Failed to load KPIs");
-            }
-        })();
+        let alive = true;
+        loadKpiData(false).then(
+            (loaded) => alive && setData(loaded),
+            (err) => alive && setError(loadError(err))
+        );
+        return () => {
+            alive = false;
+        };
     }, []);
+
+    async function refresh() {
+        setRefreshing(true);
+        try {
+            setData(await loadKpiData(true));
+        } catch (err) {
+            setError(loadError(err));
+        } finally {
+            setRefreshing(false);
+        }
+    }
 
     if (error) {
         return (
@@ -111,6 +138,27 @@ function KpiView() {
                 eyebrow="Analytics"
                 title="KPIs & Analytics"
                 subtitle="Aggregated performance across the current academic year. Hover any bar or point for details; click ↗ on a chart for full screen."
+                actions={
+                    <>
+                        <span className="text-xs text-neutral-500">
+                            Results as of{" "}
+                            {new Date(data.resultsFetchedAt).toLocaleString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                hour: "numeric",
+                                minute: "2-digit",
+                            })}
+                        </span>
+                        <button
+                            onClick={refresh}
+                            disabled={refreshing}
+                            title="Downloads every result again — use it after new marks are entered."
+                            className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+                        >
+                            {refreshing ? "Refreshing…" : "Refresh"}
+                        </button>
+                    </>
+                }
             />
 
             <div className="space-y-8 p-4 md:p-8">
@@ -156,10 +204,17 @@ function KpiView() {
                     title="Student results (latest exam)"
                     subtitle="Subject-wise marks per student for the selected class. Roll and Student columns are frozen while you scroll."
                     filters={
-                        <label className="flex items-center gap-2 text-xs text-slate-700">
-                            <span className="font-semibold uppercase tracking-widest text-slate-500">Class</span>
-                            <ClassSelector value={matrixClassId} onChange={setMatrixClassId} />
-                        </label>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <label className="flex items-center gap-2 text-xs text-slate-700">
+                                <span className="font-semibold uppercase tracking-widest text-slate-500">Class</span>
+                                <ClassSelector value={matrixClassId} onChange={setMatrixClassId} />
+                            </label>
+                            <ExportButton
+                                label="Export class results"
+                                onExport={() => exportClassResults(data, matrixClassId)}
+                                disabled={!matrixClassId}
+                            />
+                        </div>
                     }
                     heightClass="max-h-96 overflow-auto"
                     fullscreenHeightClass="max-h-[80vh] overflow-auto"
@@ -772,7 +827,7 @@ function StudentTrendCard({ data }: { data: Loaded }) {
         const subjectIds = Array.from(new Set(rs.map((r) => r.subjectId)));
 
         // Track sitting counts per (exam type) for the axis label / subtitle.
-        const sittingCounts: Record<ExamType, number> = { baseline: 0, "internal-assessment": 0, summative: 0 };
+        const sittingCounts = Object.fromEntries(EXAM_TYPES.map((et) => [et, 0])) as Record<ExamType, number>;
         for (const et of EXAM_TYPES) {
             sittingCounts[et] = new Set(
                 rs.filter((r) => r.examType === et).map((r) => `${r.examDate}#${r.examNumber}`)
@@ -1086,6 +1141,18 @@ function labelForExam(e: ExamType) {
 }
 
 // ── results matrix ─────────────────────────────────
+
+/** The class's whole academic year: a mark sheet per exam sitting, plus subject tests. No extra reads. */
+async function exportClassResults(data: Loaded, classId: string | null) {
+    const cls = data.classes.find((c) => c.id === classId);
+    if (!cls) return;
+    const students = Array.from(data.students.values()).filter((s) => s.classId === cls.id && s.isActive);
+    const subjects = Array.from(data.subjects.values()).filter((s) => s.classId === cls.id);
+    const results = data.results.filter((r) => r.classId === cls.id && r.academicYear === cls.academicYear);
+    const sheets = classResultBook(students, subjects, results);
+    if (sheets.length === 0) throw new Error("No results for this class yet.");
+    await exportWorkbook(`${fileSlug(cls.name)}_results_${cls.academicYear}`, sheets);
+}
 
 function ResultsMatrix({ data, classId }: { data: Loaded; classId: string | null }) {
     const filtered = useMemo(() => {

@@ -21,6 +21,7 @@ export default function AboutPage() {
     const timeline = data?.timeline ?? [];
     const values = data?.values ?? [];
     const infrastructure = data?.infrastructure ?? [];
+    const principal = data?.principal;
 
     return (
         <>
@@ -41,48 +42,46 @@ export default function AboutPage() {
                             <span className="text-gradient-gold">Academic Excellence</span>
                         </h1>
                         <p className="mt-6 text-lg text-ivory-400/70 max-w-2xl leading-relaxed">
-                            Since 1998, we have been committed to nurturing young minds through
-                            quality education, strong values, and holistic development.
+                            {data?.intro ||
+                                "Nurturing young minds through quality education, strong values, and holistic development."}
                         </p>
                     </FadeIn>
                 </div>
             </section>
 
-            {/* Mission / Vision (static — copy that rarely changes; edit in code if needed) */}
+            {/* Vision / Mission — each card hidden until written in Admin → About page */}
+            {(data?.vision || data?.mission) && (
             <section className="section-padding bg-white">
                 <div className="container-narrow mx-auto">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {data?.vision && (
                         <FadeIn delay={0.1}>
-                            <div className="p-8 rounded-2xl bg-navy-950 text-white">
+                            <div className="p-8 rounded-2xl bg-navy-950 text-white h-full">
                                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center mb-5">
                                     <Eye className="w-6 h-6 text-navy-950" />
                                 </div>
                                 <h3 className="text-xl font-heading font-bold mb-3">Our Vision</h3>
-                                <p className="text-ivory-400/70 leading-relaxed text-sm">
-                                    To be a beacon of educational excellence in Odisha, empowering
-                                    students with knowledge, skills, and values to become
-                                    responsible global citizens and leaders of tomorrow.
-                                </p>
+                                <p className="text-ivory-400/70 leading-relaxed text-sm whitespace-pre-line">{data.vision}</p>
                             </div>
                         </FadeIn>
+                        )}
+                        {data?.mission && (
                         <FadeIn delay={0.3}>
-                            <div className="p-8 rounded-2xl bg-gradient-to-br from-gold-50 to-ivory-100 border border-gold-100">
+                            <div className="p-8 rounded-2xl bg-gradient-to-br from-gold-50 to-ivory-100 border border-gold-100 h-full">
                                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-navy-700 to-navy-900 flex items-center justify-center mb-5">
                                     <Target className="w-6 h-6 text-gold-400" />
                                 </div>
                                 <h3 className="text-xl font-heading font-bold text-navy-950 mb-3">
                                     Our Mission
                                 </h3>
-                                <p className="text-muted leading-relaxed text-sm">
-                                    To provide accessible, high-quality education across Primary,
-                                    Intermediate, and Graduation levels with a focus on academic
-                                    rigour, character development, and holistic growth.
-                                </p>
+                                <p className="text-muted leading-relaxed text-sm whitespace-pre-line">{data.mission}</p>
                             </div>
                         </FadeIn>
+                        )}
                     </div>
                 </div>
             </section>
+            )}
 
             {/* Timeline */}
             {timeline.length > 0 && (
@@ -155,7 +154,8 @@ export default function AboutPage() {
                 </section>
             )}
 
-            {/* Principal's Message (static) */}
+            {/* Principal's Message — hidden until a name and message are entered */}
+            {principal?.name && principal.message && (
             <section className="section-padding bg-navy-950 relative overflow-hidden">
                 <div className="absolute inset-0">
                     <div className="absolute top-0 right-1/4 w-80 h-80 bg-gold-500/5 rounded-full blur-[120px]" />
@@ -163,21 +163,31 @@ export default function AboutPage() {
                 <div className="container-narrow mx-auto px-4 sm:px-6 relative">
                     <div className="max-w-3xl mx-auto text-center">
                         <FadeIn>
-                            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-navy-700 to-navy-800 flex items-center justify-center mx-auto mb-8 ring-4 ring-gold-500/20">
-                                <Users className="w-10 h-10 text-gold-400" />
-                            </div>
+                            {principal.photoUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                    src={principal.photoUrl}
+                                    alt={principal.name}
+                                    className="w-48 h-60 rounded-2xl object-cover mx-auto mb-8 ring-4 ring-gold-500/20"
+                                />
+                            ) : (
+                                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-navy-700 to-navy-800 flex items-center justify-center mx-auto mb-8 ring-4 ring-gold-500/20">
+                                    <Users className="w-10 h-10 text-gold-400" />
+                                </div>
+                            )}
                             <h2 className="text-3xl md:text-4xl font-heading font-bold text-white mb-6">Principal&apos;s Message</h2>
-                            <blockquote className="text-lg text-ivory-300/80 leading-relaxed italic mb-8">
-                                &ldquo;Education is not merely about filling minds with information, but about igniting the flame of curiosity, building character, and preparing young hearts for a meaningful life. At MahimaJyoti, we are dedicated to this noble purpose — every single day.&rdquo;
+                            <blockquote className="text-lg text-ivory-300/80 leading-relaxed italic mb-8 whitespace-pre-line">
+                                &ldquo;{principal.message}&rdquo;
                             </blockquote>
                             <div>
-                                <p className="text-gold-400 font-heading font-bold text-lg">Dr. Suresh Kumar Mishra</p>
-                                <p className="text-ivory-500/60 text-sm">Principal &amp; Director of Academics</p>
+                                <p className="text-gold-400 font-heading font-bold text-lg">{principal.name}</p>
+                                {principal.title && <p className="text-ivory-500/60 text-sm">{principal.title}</p>}
                             </div>
                         </FadeIn>
                     </div>
                 </div>
             </section>
+            )}
 
             {/* Infrastructure */}
             {infrastructure.length > 0 && (
@@ -189,19 +199,25 @@ export default function AboutPage() {
                                     Infrastructure
                                 </span>
                                 <h2 className="text-3xl md:text-4xl font-heading font-bold text-navy-950">
-                                    World-Class Facilities
+                                    Our Facilities
                                 </h2>
                             </div>
                         </FadeIn>
                         <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             {infrastructure.map((item, i) => (
-                                <motion.div key={i} variants={staggerItem} className="flex items-start gap-5 p-6 rounded-xl bg-white border border-gray-100 card-hover">
-                                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-navy-700 to-navy-900 flex items-center justify-center shrink-0">
-                                        <DynIcon name={item.icon} className="w-6 h-6 text-gold-400" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-base font-heading font-bold text-navy-950 mb-1">{item.title}</h3>
-                                        <p className="text-sm text-muted">{item.desc}</p>
+                                <motion.div key={i} variants={staggerItem} className="overflow-hidden rounded-xl bg-white border border-gray-100 card-hover">
+                                    {item.photoUrl && (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={item.photoUrl} alt={item.title} loading="lazy" className="aspect-[4/3] w-full object-cover" />
+                                    )}
+                                    <div className="flex items-start gap-5 p-6">
+                                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-navy-700 to-navy-900 flex items-center justify-center shrink-0">
+                                            <DynIcon name={item.icon} className="w-6 h-6 text-gold-400" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-base font-heading font-bold text-navy-950 mb-1">{item.title}</h3>
+                                            <p className="text-sm text-muted">{item.desc}</p>
+                                        </div>
                                     </div>
                                 </motion.div>
                             ))}

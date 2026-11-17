@@ -66,6 +66,14 @@ IX-C: Hindi; other sections: Sanskrit), or the student's choice if the section
 sheet's **Third language** column has it. To switch a student, use **Move** on
 the Students page, keep the same section, and map Sanskrit → Hindi.
 
+## Student IDs (Mahima Jyoti app)
+
+`npm run school:codes` gives every student without one a permanent Student ID
+(`MJ0001`, `MJ0002`, …, numbered by class then name) and sets `counters/studentCode`,
+which the portal uses to number students added later. Dry run by default; add
+`-- --yes` to write. Existing IDs never change. Parents sign in to the app
+(`mj-app/`) with the Student ID and a mobile number on the student's record.
+
 ## Keep subjects in step with the timetable
 
 `npm run school:subjects` lists subjects in `school/timetable.ts` that a class in

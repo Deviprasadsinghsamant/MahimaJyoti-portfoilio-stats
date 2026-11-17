@@ -7,12 +7,15 @@ export function currentAcademicYear(now = new Date()): string {
     return `${start}-${start + 1}`;
 }
 
-// In the order they're held during the year. Each type can have several
-// sittings (Internal Assessment 1, 2, …), stored as the result's examNumber.
+// The school-wide exams in the order they're held during the year, then subject
+// tests (held any time). Each type can have several sittings (Internal
+// Assessment 1, 2, …), stored as the result's examNumber; subject tests are
+// numbered per subject (Mathematics Test 1, 2, …).
 export const EXAM_TYPES: { value: ExamType; label: string }[] = [
     { value: "baseline", label: "Baseline" },
     { value: "internal-assessment", label: "Internal Assessment" },
     { value: "summative", label: "Summative Assessment" },
+    { value: "subject-test", label: "Subject Test" },
 ];
 
 export function examLabel(type: ExamType): string {

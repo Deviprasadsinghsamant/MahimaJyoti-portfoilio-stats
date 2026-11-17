@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "./AuthContext";
+import { countUnreadMessages } from "@/lib/portal/messages";
 import type { UserRole } from "@/domain/portal/types";
 
 interface NavItem {
@@ -12,6 +14,8 @@ interface NavItem {
     icon: React.ReactNode;
     roles: UserRole[];
     section: "primary" | "admin" | "content";
+    // Shows a count beside the label.
+    badge?: "messages";
 }
 
 // Simple stroke icons — no external deps.
@@ -66,6 +70,11 @@ const Icon = {
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" />
         </svg>
     ),
+    mail: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" />
+        </svg>
+    ),
     grid: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
@@ -86,13 +95,14 @@ const NAV: NavItem[] = [
     { href: "/portal/admin/classes", label: "Classes & Sections", icon: Icon.grid, roles: ["admin"], section: "admin" },
     { href: "/portal/promotion", label: "Annual Promotion", icon: Icon.stepUp, roles: ["admin"], section: "admin" },
     { href: "/portal/kpis", label: "KPIs & Analytics", icon: Icon.chart, roles: ["admin"], section: "admin" },
+    { href: "/portal/admin/messages", label: "Messages", icon: Icon.mail, roles: ["admin"], section: "content", badge: "messages" },
     { href: "/portal/admin/content/home", label: "Home page", icon: Icon.home, roles: ["admin"], section: "content" },
     { href: "/portal/admin/content/about", label: "About page", icon: Icon.file, roles: ["admin"], section: "content" },
     { href: "/portal/admin/content/academics", label: "Academics page", icon: Icon.book, roles: ["admin"], section: "content" },
     { href: "/portal/admin/content/admissions", label: "Admissions page", icon: Icon.stepUp, roles: ["admin"], section: "content" },
     { href: "/portal/admin/content/faculty", label: "Faculty profiles", icon: Icon.image, roles: ["admin"], section: "content" },
     { href: "/portal/admin/content/gallery", label: "Gallery", icon: Icon.image, roles: ["admin"], section: "content" },
-    { href: "/portal/admin/content/contact", label: "Contact page", icon: Icon.calendar, roles: ["admin"], section: "content" },
+    { href: "/portal/admin/content/contact", label: "Contact details", icon: Icon.mail, roles: ["admin"], section: "content" },
 ];
 
 const ROLE_TONE: Record<UserRole, string> = {
@@ -105,12 +115,29 @@ export function PortalNav() {
     const { portalUser, role, signOut } = useAuth();
     const pathname = usePathname();
     const [open, setOpen] = useState(false);
+    const [unread, setUnread] = useState(0);
 
+    // Admins: unread website messages, re-counted on each page change and when
+    // the Messages page marks or deletes one (a server-side count, no downloads).
     useEffect(() => {
-        setOpen(false);
-    }, [pathname]);
+        if (role !== "admin") return;
+        let alive = true;
+        const recount = () =>
+            countUnreadMessages().then(
+                (n) => alive && setUnread(n),
+                () => undefined
+            );
+        recount();
+        window.addEventListener("mj:messages-changed", recount);
+        return () => {
+            alive = false;
+            window.removeEventListener("mj:messages-changed", recount);
+        };
+    }, [role, pathname]);
 
     if (!role) return null;
+    const badges = { messages: unread };
+    const closeMenu = () => setOpen(false);
 
     const items = NAV.filter((item) => item.roles.includes(role));
     const primary = items.filter((i) => i.section === "primary");
@@ -186,21 +213,21 @@ export function PortalNav() {
                 </div>
 
                 <nav className="flex-1 overflow-y-auto px-3">
-                    <NavGroup items={primary} pathname={pathname} />
+                    <NavGroup items={primary} pathname={pathname} badges={badges} onNavigate={closeMenu} />
                     {admin.length > 0 && (
                         <>
                             <div className="mt-4 mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
                                 Admin
                             </div>
-                            <NavGroup items={admin} pathname={pathname} />
+                            <NavGroup items={admin} pathname={pathname} badges={badges} onNavigate={closeMenu} />
                         </>
                     )}
                     {content.length > 0 && (
                         <>
                             <div className="mt-4 mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                                Portfolio Content
+                                Website Content
                             </div>
-                            <NavGroup items={content} pathname={pathname} />
+                            <NavGroup items={content} pathname={pathname} badges={badges} onNavigate={closeMenu} />
                         </>
                     )}
                 </nav>
@@ -219,7 +246,18 @@ export function PortalNav() {
     );
 }
 
-function NavGroup({ items, pathname }: { items: NavItem[]; pathname: string }) {
+function NavGroup({
+    items,
+    pathname,
+    badges,
+    onNavigate,
+}: {
+    items: NavItem[];
+    pathname: string;
+    badges: Record<NonNullable<NavItem["badge"]>, number>;
+    // Closes the mobile menu after a tap.
+    onNavigate: () => void;
+}) {
     return (
         <div className="space-y-0.5">
             {items.map((item) => {
@@ -228,6 +266,7 @@ function NavGroup({ items, pathname }: { items: NavItem[]; pathname: string }) {
                     <Link
                         key={item.href}
                         href={item.href}
+                        onClick={onNavigate}
                         className={
                             "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors md:py-2 " +
                             (active
@@ -237,6 +276,11 @@ function NavGroup({ items, pathname }: { items: NavItem[]; pathname: string }) {
                     >
                         <span className={active ? "text-blue-700" : "text-slate-500 group-hover:text-slate-700"}>{item.icon}</span>
                         <span>{item.label}</span>
+                        {item.badge && badges[item.badge] > 0 && (
+                            <span className="ml-auto rounded-full bg-blue-600 px-2 py-0.5 text-[11px] font-semibold text-white">
+                                {badges[item.badge]}
+                            </span>
+                        )}
                     </Link>
                 );
             })}
@@ -247,9 +291,14 @@ function NavGroup({ items, pathname }: { items: NavItem[]; pathname: string }) {
 function BrandMark({ compact = false }: { compact?: boolean }) {
     return (
         <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 text-sm font-bold text-white shadow-sm">
-                MJ
-            </div>
+            <Image
+                src="/logo.png"
+                alt="Mahima Jyoti Awasika Vidyapitha logo"
+                width={32}
+                height={32}
+                unoptimized
+                className="h-8 w-8 rounded-full"
+            />
             {!compact && (
                 <div className="leading-tight">
                     <div className="text-sm font-semibold text-slate-900">MahimaJyoti</div>

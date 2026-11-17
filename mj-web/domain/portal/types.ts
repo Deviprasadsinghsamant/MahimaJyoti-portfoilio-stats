@@ -29,6 +29,8 @@ export interface SchoolClass {
 
 export interface Student {
     id: string;
+    // Permanent Student ID parents sign in to the app with, e.g. "MJ0042".
+    studentCode?: string;
     name: string;
     parentName: string;
     // null when not recorded (e.g. students imported from result sheets).
@@ -57,17 +59,26 @@ export interface AttendanceRecord {
     status: AttendanceStatus;
 }
 
+// One register per class per day, id `${classId}_${date}`. Saved only through the
+// saveAttendance function (mj-func/src/domains/attendance/handlers.ts).
 export interface Attendance {
     id: string;
     classId: string;
+    // ISO date (YYYY-MM-DD), India time.
     date: string;
+    academicYear: string;
     records: AttendanceRecord[];
     markedBy: string;
+    markedByName: string;
     markedByRole: UserRole;
     createdAt: number;
+    // Last save; sent back with the next save so it can't overwrite a newer one.
+    updatedAt: number;
 }
 
-export type ExamType = "baseline" | "internal-assessment" | "summative";
+// subject-test: a test in one subject (class / unit test), numbered per subject —
+// Mathematics Test 1, 2, … — with its own total marks.
+export type ExamType = "baseline" | "internal-assessment" | "summative" | "subject-test";
 
 export interface Result {
     id: string;

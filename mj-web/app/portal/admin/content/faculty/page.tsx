@@ -11,7 +11,8 @@ import {
     updateFacultyMember,
     deleteFacultyMember,
 } from "@/lib/portal/content";
-import { uploadSiteImage } from "@/lib/portal/upload";
+import { Field as HelpField, InfoTip } from "@/components/portal/admin/Help";
+import { ImageField } from "@/components/portal/admin/ImageField";
 import type { FacultyMember } from "@/domain/portal/content-types";
 
 const ACCENT_OPTIONS = [
@@ -61,18 +62,36 @@ function FacultyAdminView() {
             <PageHeader
                 eyebrow="Portfolio content"
                 title="Faculty profiles"
-                subtitle="These members show on the public /faculty page. Only active members are visible to visitors."
+                subtitle="Teacher cards on the website's Faculty page. These are public profiles — separate from teachers' portal logins."
                 actions={
                     <button
                         onClick={() => setEditing("new")}
                         className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
                     >
-                        + Add member
+                        + Add teacher
                     </button>
                 }
             />
 
             <div className="p-4 md:p-8">
+                <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-sm text-blue-950">
+                    <span className="font-semibold">
+                        {members.filter((m) => m.isActive).length} teacher{members.filter((m) => m.isActive).length === 1 ? "" : "s"} on the website
+                        · add every teacher you want parents to see, principal first
+                    </span>
+                    <InfoTip label="About faculty profiles">
+                        <strong>One card per teacher:</strong> name, role, subject, experience, qualification and a photo. Cards show three
+                        per row, ordered by <em>Position</em>.
+                        <br />
+                        <strong>Photos:</strong> landscape 4:3, 1200 × 900 px or larger, head and shoulders with space on both sides.
+                        Use the same background and framing for everyone so the page looks uniform.
+                        <br />
+                        <strong>Permission:</strong> ask each teacher before publishing their photo and details.
+                        <br />
+                        <strong>When someone leaves:</strong> untick “Show on the website” instead of deleting, so you can bring the
+                        card back later.
+                    </InfoTip>
+                </div>
                 {error && (
                     <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
                         {error}
@@ -84,7 +103,7 @@ function FacultyAdminView() {
                 ) : members.length === 0 ? (
                     <Card>
                         <div className="text-center text-sm text-slate-500">
-                            No faculty members yet. Click <strong>+ Add member</strong> to create the first.
+                            No teachers added yet. Click <strong>+ Add teacher</strong> to create the first card.
                         </div>
                     </Card>
                 ) : (
@@ -215,34 +234,8 @@ function EditDialog({
     const [order, setOrder] = useState<number>(existing?.order ?? nextOrder);
     const [isActive, setIsActive] = useState<boolean>(existing?.isActive ?? true);
     const [photoUrl, setPhotoUrl] = useState<string | null>(existing?.photoUrl ?? null);
-    const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-        const file = e.target.files?.[0];
-        e.target.value = "";
-        if (!file) return;
-        if (file.size > 8 * 1024 * 1024) {
-            setError("Image must be under 8 MB.");
-            return;
-        }
-        setUploading(true);
-        setError(null);
-        try {
-            const { url } = await uploadSiteImage("faculty", file);
-            setPhotoUrl(url);
-        } catch (err) {
-            const msg = err instanceof Error ? err.message : "Upload failed";
-            setError(
-                msg.includes("storage/unauthorized")
-                    ? "Upload denied. Check that Firebase Storage is enabled and the storage rules are deployed."
-                    : msg
-            );
-        } finally {
-            setUploading(false);
-        }
-    }
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -273,7 +266,7 @@ function EditDialog({
             >
                 <div>
                     <h2 className="text-base font-semibold text-slate-900">
-                        {existing ? "Edit faculty member" : "New faculty member"}
+                        {existing ? "Edit teacher" : "Add a teacher"}
                     </h2>
                     <p className="mt-0.5 text-xs text-slate-500">
                         Changes go live on <code>/faculty</code> immediately.
@@ -287,73 +280,54 @@ function EditDialog({
                 )}
 
                 {/* Photo */}
-                <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-700">Photo</label>
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-                            {photoUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={photoUrl} alt="" className="h-full w-full object-cover" />
-                            ) : (
-                                <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${accent} text-lg font-bold text-white`}>
-                                    {initials(name || "?")}
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex-1 space-y-2">
-                            <label className="inline-block cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-100">
-                                {uploading ? "Uploading…" : photoUrl ? "Replace photo" : "Upload photo"}
-                                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={handleFile} className="hidden" disabled={uploading} />
-                            </label>
-                            {photoUrl && (
-                                <button
-                                    type="button"
-                                    onClick={() => setPhotoUrl(null)}
-                                    className="ml-2 text-xs text-red-700 hover:underline"
-                                >
-                                    Remove photo
-                                </button>
-                            )}
-                            <div className="text-[10px] text-slate-500">
-                                JPG / PNG / WEBP, up to 8&nbsp;MB. Aspect roughly 4:3 works best.
+                <div className="max-w-xs">
+                    <div className="mb-1 block text-xs font-medium text-slate-700">Photo</div>
+                    <ImageField
+                        slot="faculty"
+                        subpath="faculty"
+                        value={photoUrl}
+                        onChange={setPhotoUrl}
+                        fallback={
+                            <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${accent} text-2xl font-bold text-white`}>
+                                {initials(name || "?")}
                             </div>
-                        </div>
-                    </div>
+                        }
+                    />
                 </div>
 
-                <Field label="Name">
-                    <input required value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
-                </Field>
-                <Field label="Role / title">
-                    <input required value={role} onChange={(e) => setRole(e.target.value)} className={inputCls} placeholder="e.g. Head of Science Department" />
-                </Field>
+                <HelpField label="Full name" hint="As it should appear on the website, with title if used (e.g. Mrs., Dr.).">
+                    <input required value={name} onChange={(e) => setName(e.target.value)} maxLength={50} className={inputCls} placeholder="Mrs. Sunita Mohanty" />
+                </HelpField>
+                <HelpField label="Role" hint="Their position at the school.">
+                    <input required value={role} onChange={(e) => setRole(e.target.value)} maxLength={50} className={inputCls} placeholder="Senior Mathematics Teacher" />
+                </HelpField>
                 <div className="grid grid-cols-2 gap-3">
-                    <Field label="Subject">
-                        <input required value={subject} onChange={(e) => setSubject(e.target.value)} className={inputCls} />
-                    </Field>
-                    <Field label="Experience">
-                        <input required value={experience} onChange={(e) => setExperience(e.target.value)} className={inputCls} placeholder="e.g. 12 years" />
-                    </Field>
+                    <HelpField label="Subject(s)" hint="What they teach.">
+                        <input required value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={50} className={inputCls} placeholder="Mathematics" />
+                    </HelpField>
+                    <HelpField label="Experience" hint="Years of teaching.">
+                        <input required value={experience} onChange={(e) => setExperience(e.target.value)} maxLength={20} className={inputCls} placeholder="12 years" />
+                    </HelpField>
                 </div>
-                <Field label="Qualification">
-                    <input required value={qualification} onChange={(e) => setQualification(e.target.value)} className={inputCls} placeholder="Ph.D. in Chemistry, IIT Kharagpur" />
-                </Field>
+                <HelpField label="Qualification" hint="Highest degrees, e.g. M.Sc., B.Ed.">
+                    <input required value={qualification} onChange={(e) => setQualification(e.target.value)} maxLength={80} className={inputCls} placeholder="M.Sc. (Mathematics), B.Ed." />
+                </HelpField>
                 <div className="grid grid-cols-2 gap-3">
-                    <Field label="Accent (used when no photo)">
+                    <HelpField label="Position" hint="Lower numbers appear first — e.g. principal 1, vice-principal 2.">
+                        <input type="number" value={order} onChange={(e) => setOrder(Number(e.target.value) || 0)} className={inputCls} />
+                    </HelpField>
+                    <HelpField label="Colour if no photo" hint="Background behind their initials until a photo is added.">
                         <select value={accent} onChange={(e) => setAccent(e.target.value)} className={inputCls}>
                             {ACCENT_OPTIONS.map((o) => (
                                 <option key={o.value} value={o.value}>{o.label}</option>
                             ))}
                         </select>
-                    </Field>
-                    <Field label="Sort order">
-                        <input type="number" value={order} onChange={(e) => setOrder(Number(e.target.value) || 0)} className={inputCls} />
-                    </Field>
+                    </HelpField>
                 </div>
 
                 <label className="flex items-center gap-2 text-xs text-slate-700">
                     <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-                    Show on public /faculty page
+                    Show on the website (untick to hide without deleting, e.g. when someone leaves)
                 </label>
 
                 <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
@@ -362,7 +336,7 @@ function EditDialog({
                     </button>
                     <button
                         type="submit"
-                        disabled={saving || uploading}
+                        disabled={saving}
                         className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                     >
                         {saving ? "Saving…" : existing ? "Save changes" : "Create"}
@@ -373,16 +347,7 @@ function EditDialog({
     );
 }
 
-const inputCls = "w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500";
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <label className="block text-xs font-medium text-slate-700">
-            <span className="mb-1 block">{label}</span>
-            {children}
-        </label>
-    );
-}
+const inputCls = "w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500";
 
 function initials(name: string) {
     return name

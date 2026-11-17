@@ -24,6 +24,7 @@ import {
     Lightbulb,
     Mail,
     MapPin,
+    MessageCircle,
     Palette,
     Phone,
     Shield,
@@ -42,7 +43,7 @@ export type IconName =
     | "Award" | "Beaker" | "Binary" | "BookOpen" | "Building2"
     | "Calculator" | "Calendar" | "Camera" | "CheckCircle2" | "ClipboardCheck"
     | "Clock" | "FileText" | "Globe2" | "GraduationCap" | "Heart"
-    | "Languages" | "Lightbulb" | "Mail" | "MapPin" | "Palette"
+    | "Languages" | "Lightbulb" | "Mail" | "MapPin" | "MessageCircle" | "Palette"
     | "Phone" | "Shield" | "Star" | "Target" | "Trophy" | "Users"
     | "Facebook" | "Twitter" | "Instagram" | "Linkedin" | "Youtube";
 
@@ -50,7 +51,7 @@ export const ICON_MAP: Record<IconName, LucideIcon> = {
     Award, Beaker, Binary, BookOpen, Building2,
     Calculator, Calendar, Camera, CheckCircle2, ClipboardCheck,
     Clock, FileText, Globe2, GraduationCap, Heart,
-    Languages, Lightbulb, Mail, MapPin, Palette,
+    Languages, Lightbulb, Mail, MapPin, MessageCircle, Palette,
     Phone, Shield, Star, Target, Trophy, Users,
     Facebook, Twitter, Instagram, Linkedin, Youtube,
 };

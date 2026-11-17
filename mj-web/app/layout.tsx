@@ -22,26 +22,23 @@ export const metadata: Metadata = {
     template: "%s | MahimaJyoti",
   },
   description:
-    "A premier educational institution offering Primary (BSE), Intermediate (CHSE), and Graduation (Utkal University) programs. Nurturing minds, shaping futures since establishment.",
+    "Mahima Jyoti Awasika Vidyapitha is a residential school in Hakimapada, Angul, Odisha. Nurturing minds, shaping futures.",
   keywords: [
-    "school",
-    "education",
-    "BSE board",
-    "CHSE board",
-    "Utkal University",
-    "primary education",
-    "intermediate",
-    "graduation",
+    "Mahima Jyoti",
+    "Mahima Jyoti Awasika Vidyapitha",
+    "residential school",
+    "school in Angul",
+    "Angul",
     "Odisha",
+    "education",
   ],
-  authors: [{ name: "MahimaJyoti" }],
+  authors: [{ name: "Mahima Jyoti Awasika Vidyapitha" }],
   openGraph: {
     type: "website",
     locale: "en_IN",
     siteName: "MahimaJyoti",
     title: "MahimaJyoti — Excellence in Education",
-    description:
-      "A premier educational institution offering Primary, Intermediate, and Graduation programs.",
+    description: "Mahima Jyoti Awasika Vidyapitha — a residential school in Angul, Odisha.",
   },
 };
 

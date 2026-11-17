@@ -127,7 +127,7 @@ export default function AdmissionsPage() {
                                 <span className="inline-block px-4 py-1.5 rounded-full bg-navy-50 text-navy-600 text-xs font-semibold tracking-wider uppercase mb-4">Fee Structure</span>
                                 <h2 className="text-3xl md:text-4xl font-heading font-bold text-navy-950">Affordable Quality Education</h2>
                                 <p className="mt-3 text-muted max-w-xl mx-auto text-sm">
-                                    We believe quality education should be accessible. Scholarships available for meritorious and economically weaker students.
+                                    We believe quality education should be accessible. Fees for each class are listed below.
                                 </p>
                             </div>
                         </FadeIn>

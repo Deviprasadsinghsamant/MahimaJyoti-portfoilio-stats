@@ -29,6 +29,8 @@ export interface SchoolClass {
 
 export interface Student {
     id: string;
+    // Permanent Student ID parents sign in to the app with, e.g. "MJ0042".
+    studentCode?: string;
     name: string;
     parentName: string;
     // null when not recorded (e.g. students imported from result sheets).
@@ -57,17 +59,39 @@ export interface AttendanceRecord {
     status: AttendanceStatus;
 }
 
+// One register per class per day, id `${classId}_${date}`. Written only by the
+// saveAttendance function, which checks who may mark it.
 export interface Attendance {
     id: string;
     classId: string;
+    // ISO date (YYYY-MM-DD), India time.
     date: string;
+    academicYear: string;
     records: AttendanceRecord[];
     markedBy: string;
+    markedByName: string;
     markedByRole: UserRole;
     createdAt: number;
+    // Last save. Clients send back the value they started from, so a save can't
+    // silently overwrite someone else's newer one.
+    updatedAt: number;
 }
 
-export type ExamType = "baseline" | "internal-assessment" | "summative";
+export type AttendanceMark = "P" | "A";
+
+// attendanceSummary/{studentId}_{academicYear}: one student's attendance for a
+// year, kept current by saveAttendance — so parents and teachers read one
+// document instead of every register.
+export interface AttendanceSummary {
+    studentId: string;
+    academicYear: string;
+    days: Record<string, AttendanceMark>;
+    updatedAt: number;
+}
+
+// subject-test: a test in one subject (class / unit test), numbered per subject —
+// Mathematics Test 1, 2, … — with its own total marks.
+export type ExamType = "baseline" | "internal-assessment" | "summative" | "subject-test";
 
 export interface Result {
     id: string;

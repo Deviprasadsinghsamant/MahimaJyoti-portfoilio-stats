@@ -33,12 +33,12 @@ export default function AcademicsPage() {
                             Academics
                         </span>
                         <h1 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold text-white leading-tight">
-                            Three Streams,
+                            Every Stage,
                             <br />
                             <span className="text-gradient-gold">One Vision</span>
                         </h1>
                         <p className="mt-6 text-lg text-ivory-400/70 max-w-2xl leading-relaxed">
-                            From foundational learning to university-level education — explore our comprehensive academic programs designed for every stage of growth.
+                            Explore what we teach at each stage of a child&apos;s schooling, and the subjects every class studies.
                         </p>
                     </FadeIn>
                 </div>

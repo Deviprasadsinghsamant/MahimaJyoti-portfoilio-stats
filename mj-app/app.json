@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "Mahima Jyoti",
+    "slug": "mahimajyoti",
+    "scheme": "mahimajyoti",
+    "version": "1.0.2",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.mahimajyoti.app"
+    },
+    "android": {
+      "package": "com.mahimajyoti.app",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "versionCode": 3,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "dynamic"
+          },
+          "android": {
+            "kotlinVersion": "2.3.21"
+          }
+        }
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      [
+        "@react-native-firebase/messaging",
+        {
+          "android": {
+            "notificationColor": "#1E2A78"
+          }
+        }
+      ],
+      "./plugins/withLongPathCmake",
+      "./plugins/withReleaseSigning",
+      "./plugins/withNotificationIcon"
+    ],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

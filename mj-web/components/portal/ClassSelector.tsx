@@ -8,9 +8,11 @@ interface Props {
     value: string | null;
     onChange: (classId: string) => void;
     onLoad?: (classes: SchoolClass[]) => void;
+    // Offer only some classes. Pass a stable (memoised) function.
+    filter?: (cls: SchoolClass) => boolean;
 }
 
-export function ClassSelector({ value, onChange, onLoad }: Props) {
+export function ClassSelector({ value, onChange, onLoad, filter }: Props) {
     const [classes, setClasses] = useState<SchoolClass[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -18,7 +20,9 @@ export function ClassSelector({ value, onChange, onLoad }: Props) {
         let mounted = true;
         listClasses().then((list) => {
             if (!mounted) return;
-            const sorted = [...list].sort((a, b) => a.grade - b.grade || a.section.localeCompare(b.section));
+            const sorted = list
+                .filter((c) => !filter || filter(c))
+                .sort((a, b) => a.grade - b.grade || a.section.localeCompare(b.section));
             setClasses(sorted);
             setLoading(false);
             onLoad?.(sorted);
@@ -27,7 +31,7 @@ export function ClassSelector({ value, onChange, onLoad }: Props) {
         return () => {
             mounted = false;
         };
-    }, [onChange, onLoad, value]);
+    }, [onChange, onLoad, value, filter]);
 
     return (
         <select

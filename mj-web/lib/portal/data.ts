@@ -4,13 +4,17 @@ import {
     doc,
     getDoc,
     getDocs,
+    getDocsFromCache,
+    getDocsFromServer,
     query,
+    runTransaction,
     setDoc,
     updateDoc,
     where,
     writeBatch,
 } from "firebase/firestore";
-import { getFirebaseDb } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
+import { getFirebaseDb, getFirebaseFunctions } from "@/lib/firebase";
 import { withTokenRetry } from "@/lib/auth";
 import { memo, invalidate } from "./cache";
 import type {
@@ -88,16 +92,57 @@ export async function listStudents(classId: string, opts?: { includeInactive?: b
     });
 }
 
-export async function createStudent(input: Omit<Student, "id" | "createdAt" | "isActive"> & { isActive?: boolean }): Promise<Student> {
+// Keep in sync with formatStudentCode in scripts/assign-student-codes.ts.
+export function formatStudentCode(n: number): string {
+    return `MJ${String(n).padStart(4, "0")}`;
+}
+
+// Last 10 digits of an Indian mobile number (accepts +91 / 91 / 0 prefixes), or
+// null if it isn't one. The parent app accepts any number normalised this way.
+export function normalizeMobile(raw: string): string | null {
+    let digits = raw.replace(/\D/g, "");
+    if (digits.length === 12 && digits.startsWith("91")) digits = digits.slice(2);
+    if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
+    return /^[6-9]\d{9}$/.test(digits) ? digits : null;
+}
+
+/**
+ * Parse mobile numbers typed one per line or comma-separated into the stored
+ * form ("+919937804220, +918144900856"). Throws on anything that isn't a mobile.
+ */
+export function formatContactNumbers(raw: string): string {
+    const parts = raw.split(/[\n,;/]/).map((p) => p.trim()).filter(Boolean);
+    const numbers: string[] = [];
+    for (const p of parts) {
+        const n = normalizeMobile(p);
+        if (!n) throw new Error(`"${p}" isn't a 10-digit mobile number.`);
+        if (!numbers.includes(n)) numbers.push(n);
+    }
+    return numbers.map((n) => `+91${n}`).join(", ");
+}
+
+/** Create a student with the next Student ID (counters/studentCode), atomically. */
+export async function createStudent(
+    input: Omit<Student, "id" | "createdAt" | "isActive" | "studentCode"> & { isActive?: boolean }
+): Promise<Student> {
     return withTokenRetry(async () => {
-        const ref = doc(collection(db(), "students"));
-        const student: Student = {
-            ...input,
-            id: ref.id,
-            isActive: input.isActive ?? true,
-            createdAt: Date.now(),
-        };
-        await setDoc(ref, student);
+        const database = db();
+        const ref = doc(collection(database, "students"));
+        const counterRef = doc(database, "counters", "studentCode");
+        const student = await runTransaction(database, async (tx) => {
+            const counter = await tx.get(counterRef);
+            const next = (counter.exists() ? Number(counter.data().next) : 0) || 1;
+            const created: Student = {
+                ...input,
+                id: ref.id,
+                studentCode: formatStudentCode(next),
+                isActive: input.isActive ?? true,
+                createdAt: Date.now(),
+            };
+            tx.set(ref, created);
+            tx.set(counterRef, { next: next + 1 });
+            return created;
+        });
         invalidate("students:");
         return student;
     });
@@ -204,48 +249,47 @@ export async function deleteSubject(id: string) {
 }
 
 // Attendance ──────────────────────────────────────
+// Registers are read straight from Firestore (one document per class per day)
+// and saved through the saveAttendance function, which checks that the saver is
+// the class teacher (or an admin — the principal) and tells the parents. A
+// class teacher's register is final once saved; only an admin can correct it.
+
+// Class teachers can take today's register, or a missed one up to this many days back.
+// Keep in sync with TEACHER_MARK_DAYS_BACK in mj-func/src/domains/attendance/handlers.ts.
+export const TEACHER_MARK_DAYS_BACK = 2;
+
 export async function getAttendance(classId: string, date: string): Promise<Attendance | null> {
     return memo(`attendance:${classId}:${date}`, async () => {
-        const snap = await getDocs(
-            query(
-                collection(db(), "attendance"),
-                where("classId", "==", classId),
-                where("date", "==", date)
-            )
-        );
-        if (snap.empty) return null;
-        return snap.docs[0].data() as Attendance;
+        const snap = await getDoc(doc(db(), "attendance", `${classId}_${date}`));
+        return snap.exists() ? ({ updatedAt: 0, ...snap.data() } as Attendance) : null;
     });
 }
 
-export async function upsertAttendance(
+export interface SaveAttendanceResult {
+    // Nothing was written for these; `register` is the one on record.
+    // "conflict": someone else saved this register meanwhile.
+    // "locked": a teacher tried to change a finalised register (admins only).
+    status: "saved" | "conflict" | "locked";
+    register: Attendance;
+}
+
+/** Save the whole register in one call. baseUpdatedAt: updatedAt of the register being edited, or null if new. */
+export async function saveAttendance(
     classId: string,
     date: string,
     records: AttendanceRecord[],
-    markedBy: string,
-    markedByRole: UserRole
-): Promise<Attendance> {
-    return withTokenRetry(async () => {
-        const existing = await getAttendance(classId, date);
-        if (existing) {
-            await updateDoc(doc(db(), "attendance", existing.id), { records, markedBy, markedByRole });
-            invalidate("attendance:");
-            return { ...existing, records, markedBy, markedByRole };
-        }
-        const ref = doc(collection(db(), "attendance"));
-        const attendance: Attendance = {
-            id: ref.id,
-            classId,
-            date,
-            records,
-            markedBy,
-            markedByRole,
-            createdAt: Date.now(),
-        };
-        await setDoc(ref, attendance);
-        invalidate("attendance:");
-        return attendance;
-    });
+    baseUpdatedAt: number | null
+): Promise<SaveAttendanceResult> {
+    const call = httpsCallable<
+        { classId: string; date: string; records: AttendanceRecord[]; baseUpdatedAt: number | null },
+        SaveAttendanceResult
+    >(getFirebaseFunctions(), "saveAttendance");
+    try {
+        const { data } = await call({ classId, date, records, baseUpdatedAt });
+        return data;
+    } finally {
+        invalidate(`attendance:${classId}:${date}`);
+    }
 }
 
 // Users lookup ────────────────────────────────────
@@ -275,6 +319,28 @@ export async function listResults(filter: { classId?: string; subjectId?: string
         if (filter.subjectId) constraints.push(where("subjectId", "==", filter.subjectId));
         if (filter.studentId) constraints.push(where("studentId", "==", filter.studentId));
         const snap = await getDocs(query(collection(db(), "results"), ...constraints));
+        return snap.docs.map((d) => d.data() as Result);
+    });
+}
+
+// One exam sitting's results for a class (every subject) — e.g. for a class mark
+// sheet. Reads only that sitting, not every result the class has.
+export async function listExamResults(
+    classId: string,
+    examType: Result["examType"],
+    examNumber: number,
+    academicYear: string
+): Promise<Result[]> {
+    return memo(`results:${classId}:exam:${examType}:${examNumber}:${academicYear}`, async () => {
+        const snap = await getDocs(
+            query(
+                collection(db(), "results"),
+                where("classId", "==", classId),
+                where("examType", "==", examType),
+                where("examNumber", "==", examNumber),
+                where("academicYear", "==", academicYear)
+            )
+        );
         return snap.docs.map((d) => d.data() as Result);
     });
 }
@@ -312,12 +378,39 @@ export async function upsertResult(input: Omit<Result, "id" | "createdAt">): Pro
     });
 }
 
-// Fetch all results in one shot for KPI dashboards.
-export async function listAllResults(): Promise<Result[]> {
-    return memo("results:all", async () => {
-        const snap = await getDocs(collection(db(), "results"));
-        return snap.docs.map((d) => d.data() as Result);
-    });
+// Every result, for the KPI dashboard. That's thousands of documents — and as
+// many billable reads each time they come from the server — so they're served
+// from Firestore's local cache and downloaded again at most once a day, or when
+// the admin presses Refresh.
+const RESULTS_FETCHED_KEY = "mj:kpi:resultsFetchedAt";
+const RESULTS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function readFetchedAt(): number {
+    try {
+        return Number(window.localStorage.getItem(RESULTS_FETCHED_KEY)) || 0;
+    } catch {
+        return 0;
+    }
+}
+
+export async function listAllResults(opts: { fresh?: boolean } = {}): Promise<{ results: Result[]; fetchedAt: number }> {
+    const fetchedAt = readFetchedAt();
+    if (!opts.fresh && fetchedAt && Date.now() - fetchedAt < RESULTS_MAX_AGE_MS) {
+        try {
+            const cached = await getDocsFromCache(collection(db(), "results"));
+            if (!cached.empty) return { results: cached.docs.map((d) => d.data() as Result), fetchedAt };
+        } catch {
+            // No local cache (private window, storage cleared): download below.
+        }
+    }
+    const snap = await getDocsFromServer(collection(db(), "results"));
+    const now = Date.now();
+    try {
+        window.localStorage.setItem(RESULTS_FETCHED_KEY, String(now));
+    } catch {
+        // Without storage the next visit downloads again.
+    }
+    return { results: snap.docs.map((d) => d.data() as Result), fetchedAt: now };
 }
 
 // Syllabus ───────────────────────────────────────

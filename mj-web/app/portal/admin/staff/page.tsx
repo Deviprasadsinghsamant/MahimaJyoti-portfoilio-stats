@@ -5,7 +5,9 @@ import Link from "next/link";
 import { RoleGate } from "@/components/portal/RoleGate";
 import { PageHeader } from "@/components/portal/PageHeader";
 import { Badge } from "@/components/portal/ui/Badge";
+import { ExportButton } from "@/components/portal/ExportButton";
 import { listClasses, listStaff, listSubjects, sortClasses } from "@/lib/portal/data";
+import { exportWorkbook } from "@/lib/portal/exportExcel";
 import {
     MIN_PASSWORD_LENGTH,
     assignmentsFor,
@@ -73,6 +75,37 @@ function StaffAdminView() {
             );
     }, [dir, roleFilter, showInactive]);
 
+    // The list as shown (same role / inactive filters), with each person's classes and subjects.
+    async function handleExport() {
+        if (!dir) return;
+        await exportWorkbook("staff-and-teachers", [
+            {
+                name: "Staff & Teachers",
+                header: ["Name", "Phone", "Role", "Status", "Class teacher of", "Teaches"],
+                rows: rows.map((u) => {
+                    const classTeacherOf = dir.classes.filter((c) => c.classTeacherId === u.uid).map((c) => c.name);
+                    const teaches = dir.classes
+                        .map((c) => {
+                            const names = dir.subjects
+                                .filter((s) => s.teacherId === u.uid && s.classId === c.id)
+                                .map((s) => s.name)
+                                .sort((a, b) => a.localeCompare(b));
+                            return names.length ? `${c.name}: ${names.join(", ")}` : null;
+                        })
+                        .filter((t): t is string => t !== null);
+                    return [
+                        u.displayName,
+                        u.phone,
+                        ROLE_LABEL[u.role as StaffRole] ?? u.role,
+                        u.isActive ? "Active" : "Inactive",
+                        classTeacherOf.join(", "),
+                        teaches.join("; "),
+                    ];
+                }),
+            },
+        ]);
+    }
+
     // Subjects nobody active is teaching — unassigned, or still on a deactivated account.
     const subjectsWithoutTeacher = useMemo(() => {
         if (!dir) return [];
@@ -120,6 +153,7 @@ function StaffAdminView() {
                 subtitle="Create portal logins and set which classes and subjects each person teaches."
                 actions={
                     <>
+                        <ExportButton onExport={handleExport} disabled={!dir || rows.length === 0} />
                         <button
                             onClick={() => setDialog({ mode: "create", role: "teacher" })}
                             disabled={!dir}

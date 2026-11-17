@@ -7,7 +7,8 @@ import { useAuth } from "@/components/portal/AuthContext";
 import {
     listStudents,
     getAttendance,
-    upsertAttendance,
+    saveAttendance,
+    TEACHER_MARK_DAYS_BACK,
 } from "@/lib/portal/data";
 import {
     loadAttendanceDraft,
@@ -15,13 +16,26 @@ import {
     clearAttendanceDraft,
 } from "@/lib/portal/attendanceDraft";
 import type {
+    Attendance,
     AttendanceStatus,
+    SchoolClass,
     Student,
-    UserRole,
 } from "@/domain/portal/types";
 
+// The date in India (the browser's local date), not UTC.
 function todayIso() {
-    return new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+}
+
+function addDays(iso: string, days: number) {
+    const d = new Date(`${iso}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+}
+
+function formatTime(ms: number) {
+    return new Date(ms).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
 export default function AttendancePage() {
@@ -34,21 +48,34 @@ export default function AttendancePage() {
 
 function AttendanceView() {
     const { firebaseUser, role } = useAuth();
-    const canEdit = role === "admin" || role === "teacher" || role === "staff";
+    const isAdmin = role === "admin";
+    const uid = firebaseUser?.uid ?? null;
+
+    // Class teachers mark only their own class; admins can mark any class, any past day.
+    const classFilter = useCallback(
+        (c: SchoolClass) => isAdmin || (!!uid && c.classTeacherId === uid),
+        [isAdmin, uid]
+    );
+    const [classCount, setClassCount] = useState<number | null>(null);
+    const onClassesLoaded = useCallback((list: SchoolClass[]) => setClassCount(list.length), []);
+    const today = todayIso();
+    const minDate = isAdmin ? undefined : addDays(today, -TEACHER_MARK_DAYS_BACK);
 
     const [classId, setClassId] = useState<string | null>(null);
-    const [date, setDate] = useState(todayIso());
+    const [date, setDate] = useState(today);
     const [students, setStudents] = useState<Student[]>([]);
     const [marks, setMarks] = useState<Record<string, AttendanceStatus>>({});
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
-    const [existingId, setExistingId] = useState<string | null>(null);
+    const [existing, setExisting] = useState<Attendance | null>(null);
     const [draftRestored, setDraftRestored] = useState(false);
     const [dirty, setDirty] = useState(false);
 
-    const uid = firebaseUser?.uid ?? null;
+    // A teacher's register is final once saved; only an admin (the principal) corrects it.
+    const locked = !isAdmin && !!existing;
+    const canEdit = !!classId && !locked;
 
     const load = useCallback(async () => {
         if (!classId || !uid) return;
@@ -70,19 +97,19 @@ function AttendanceView() {
             setStudents(studentList);
 
             const base: Record<string, AttendanceStatus> = {};
-            if (existing) {
-                setExistingId(existing.id);
-                existing.records.forEach((r) => (base[r.studentId] = r.status));
-            } else {
-                setExistingId(null);
-            }
+            setExisting(existing);
+            existing?.records.forEach((r) => (base[r.studentId] = r.status));
             studentList.forEach((s) => {
                 if (!(s.id in base)) base[s.id] = "present";
             });
 
-            // Draft overrides remote if it exists and is newer / unsaved
+            // Draft overrides remote if it exists and is newer / unsaved — unless the
+            // register is already final for this teacher.
             const draft = loadAttendanceDraft(uid, classId, date);
-            if (draft) {
+            if (draft && existing && !isAdmin) {
+                clearAttendanceDraft(uid, classId, date);
+                setMarks(base);
+            } else if (draft) {
                 setMarks({ ...base, ...draft.marks });
                 setDraftRestored(true);
                 setDirty(true);
@@ -94,7 +121,7 @@ function AttendanceView() {
         } finally {
             setLoading(false);
         }
-    }, [classId, date, uid]);
+    }, [classId, date, uid, isAdmin]);
 
     useEffect(() => {
         load();
@@ -111,8 +138,12 @@ function AttendanceView() {
         setDirty(true);
     }
 
+    // The whole register goes in one call, once everyone is marked.
     async function handleSave() {
-        if (!classId || !firebaseUser || !uid) return;
+        if (!classId || !uid) return;
+        if (!isAdmin && !window.confirm("Save this register? Once saved it's final — only the principal can correct it.")) {
+            return;
+        }
         setSaving(true);
         setError(null);
         setMessage(null);
@@ -121,11 +152,26 @@ function AttendanceView() {
                 studentId: s.id,
                 status: marks[s.id] ?? "present",
             }));
-            await upsertAttendance(classId, date, records, firebaseUser.uid, role as UserRole);
+            const { status, register } = await saveAttendance(classId, date, records, existing?.updatedAt ?? null);
             clearAttendanceDraft(uid, classId, date);
-            setMessage("Saved.");
+            setExisting(register);
             setDirty(false);
             setDraftRestored(false);
+            if (status !== "saved") {
+                const theirs: Record<string, AttendanceStatus> = {};
+                students.forEach((s) => (theirs[s.id] = "present"));
+                register.records.forEach((r) => (theirs[r.studentId] = r.status));
+                setMarks(theirs);
+                setError(
+                    `${register.markedByName || "Someone else"} saved this register at ${formatTime(register.updatedAt)}, ` +
+                    "after you opened it. Their marks are shown now" +
+                    (status === "locked"
+                        ? " — it's final, and only the principal can correct it."
+                        : " — check them and save again if anything is wrong.")
+                );
+            } else {
+                setMessage("Saved. Parents of absent students have been notified.");
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to save");
         } finally {
@@ -167,7 +213,10 @@ function AttendanceView() {
                             Attendance
                         </h1>
                         <p className="text-xs text-neutral-500 md:text-sm">
-                            {existingId ? "Editing existing record." : "New record for this day."}
+                            {existing
+                                ? `Saved by ${existing.markedByName || "a teacher"} · ${formatTime(existing.updatedAt)}` +
+                                  (locked ? " · Final — only the principal can correct it." : "")
+                                : "Not marked yet for this day."}
                         </p>
                     </div>
                     {canEdit && classId && (
@@ -176,7 +225,7 @@ function AttendanceView() {
                             disabled={saving || loading}
                             className="hidden rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50 md:inline-block"
                         >
-                            {saving ? "Saving…" : existingId ? "Update" : "Save"}
+                            {saving ? "Saving…" : existing ? "Update" : "Save"}
                         </button>
                     )}
                 </div>
@@ -184,15 +233,16 @@ function AttendanceView() {
                 <div className="flex flex-wrap items-center gap-3 border-t border-neutral-100 px-4 py-2 text-sm md:px-8">
                     <label className="flex items-center gap-2 text-neutral-700">
                         <span className="text-xs uppercase text-neutral-500 md:text-sm md:normal-case md:text-neutral-700">Class</span>
-                        <ClassSelector value={classId} onChange={setClassId} />
+                        <ClassSelector value={classId} onChange={setClassId} onLoad={onClassesLoaded} filter={classFilter} />
                     </label>
                     <label className="flex items-center gap-2 text-neutral-700">
                         <span className="text-xs uppercase text-neutral-500 md:text-sm md:normal-case md:text-neutral-700">Date</span>
                         <input
                             type="date"
                             value={date}
-                            max={todayIso()}
-                            onChange={(e) => setDate(e.target.value)}
+                            min={minDate}
+                            max={today}
+                            onChange={(e) => e.target.value && setDate(e.target.value)}
                             className="rounded border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-900"
                         />
                     </label>
@@ -203,23 +253,37 @@ function AttendanceView() {
                     </div>
                 </div>
 
-                <div className="flex gap-2 border-t border-neutral-100 px-4 py-2 md:px-8">
-                    <button
-                        onClick={() => markAll("present")}
-                        className="flex-1 rounded border border-neutral-300 py-1.5 text-xs text-neutral-700 hover:bg-neutral-100 md:flex-initial md:px-3"
-                    >
-                        All present
-                    </button>
-                    <button
-                        onClick={() => markAll("absent")}
-                        className="flex-1 rounded border border-neutral-300 py-1.5 text-xs text-neutral-700 hover:bg-neutral-100 md:flex-initial md:px-3"
-                    >
-                        All absent
-                    </button>
-                </div>
+                {canEdit && (
+                    <div className="flex gap-2 border-t border-neutral-100 px-4 py-2 md:px-8">
+                        <button
+                            onClick={() => markAll("present")}
+                            className="flex-1 rounded border border-neutral-300 py-1.5 text-xs text-neutral-700 hover:bg-neutral-100 md:flex-initial md:px-3"
+                        >
+                            All present
+                        </button>
+                        <button
+                            onClick={() => markAll("absent")}
+                            className="flex-1 rounded border border-neutral-300 py-1.5 text-xs text-neutral-700 hover:bg-neutral-100 md:flex-initial md:px-3"
+                        >
+                            All absent
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div className="p-4 md:p-8">
+                {classCount === 0 && (
+                    <div className="mb-3 rounded border border-dashed border-neutral-300 bg-white p-6 text-center text-sm text-neutral-600">
+                        Attendance is marked by each class&apos;s class teacher, and you aren&apos;t the class teacher of any
+                        class. The school office can assign you in Classes &amp; Sections.
+                    </div>
+                )}
+                {!isAdmin && classCount !== 0 && (
+                    <p className="mb-3 text-xs text-neutral-500">
+                        Take today&apos;s register, or a missed one from the last {TEACHER_MARK_DAYS_BACK} days. Once saved it&apos;s
+                        final — only the principal can correct it. Parents of absent students get a notification when you save.
+                    </p>
+                )}
                 {(error || message || draftRestored) && (
                     <div className="mb-3 space-y-2">
                         {error && (
@@ -299,7 +363,7 @@ function AttendanceView() {
                         disabled={saving || loading}
                         className="w-full rounded bg-neutral-900 py-3 text-sm font-semibold text-white hover:bg-neutral-800 disabled:opacity-50"
                     >
-                        {saving ? "Saving…" : existingId ? "Update attendance" : "Save attendance"}
+                        {saving ? "Saving…" : existing ? "Update attendance" : "Save attendance"}
                         {dirty && !saving && <span className="ml-2 text-xs opacity-75">· unsaved</span>}
                     </button>
                 </div>

@@ -4,7 +4,9 @@
 export type UserRole = "admin" | "teacher" | "staff";
 export type Gender = "male" | "female" | "other";
 export type AttendanceStatus = "present" | "absent";
-export type ExamType = "baseline" | "internal-assessment" | "summative";
+// subject-test: a test in one subject (class / unit test), numbered per subject —
+// Mathematics Test 1, 2, … — with its own total marks.
+export type ExamType = "baseline" | "internal-assessment" | "summative" | "subject-test";
 
 export interface SchoolClass {
     id: string;
@@ -17,6 +19,8 @@ export interface SchoolClass {
 
 export interface Student {
     id: string;
+    // Permanent Student ID parents sign in to the app with, e.g. "MJ0042".
+    studentCode?: string;
     name: string;
     parentName: string;
     gender: Gender | null;

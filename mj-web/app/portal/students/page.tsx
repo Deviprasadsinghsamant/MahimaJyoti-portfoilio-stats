@@ -4,10 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { RoleGate } from "@/components/portal/RoleGate";
 import { PageHeader } from "@/components/portal/PageHeader";
 import { ClassSelector } from "@/components/portal/ClassSelector";
+import { ExportButton } from "@/components/portal/ExportButton";
 import { useAuth } from "@/components/portal/AuthContext";
 import {
     listStudents,
     createStudent,
+    updateStudent,
+    formatContactNumbers,
     setStudentActive,
     listClasses,
     listSubjects,
@@ -16,6 +19,7 @@ import {
     sortClasses,
 } from "@/lib/portal/data";
 import { currentAcademicYear } from "@/lib/portal/academic";
+import { exportWorkbook, fileSlug } from "@/lib/portal/exportExcel";
 import type { Gender, SchoolClass, Student, Subject } from "@/domain/portal/types";
 
 export default function StudentsPage() {
@@ -31,6 +35,8 @@ function StudentsView() {
     const isAdmin = role === "admin";
 
     const [classId, setClassId] = useState<string | null>(null);
+    const [classes, setClasses] = useState<SchoolClass[]>([]);
+    const onClassesLoaded = useCallback((list: SchoolClass[]) => setClasses(list), []);
     const [showInactive, setShowInactive] = useState(false);
     const [students, setStudents] = useState<Student[]>([]);
     const [loading, setLoading] = useState(false);
@@ -40,6 +46,7 @@ function StudentsView() {
     // Admin: students ticked for moving, and the ones the move dialog is open for.
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [moving, setMoving] = useState<Student[] | null>(null);
+    const [editing, setEditing] = useState<Student | null>(null);
 
     const refresh = useCallback(async () => {
         if (!classId) return;
@@ -63,6 +70,27 @@ function StudentsView() {
 
     const allSelected = students.length > 0 && students.every((s) => selected.has(s.id));
 
+    // The class list as shown (including deactivated students when they're shown).
+    async function handleExport() {
+        const className = classes.find((c) => c.id === classId)?.name ?? "Class";
+        await exportWorkbook(`${fileSlug(className)}_students`, [
+            {
+                name: className,
+                header: ["Roll", "Student", "Student ID", "Gender", "Parent", "Mobile numbers", "Admission year", "Status"],
+                rows: students.map((s) => [
+                    s.rollNo ?? "",
+                    s.name,
+                    s.studentCode ?? "",
+                    s.gender ? s.gender[0].toUpperCase() + s.gender.slice(1) : "",
+                    s.parentName,
+                    s.contactNumber,
+                    s.admissionYear,
+                    s.isActive ? "Active" : "Inactive",
+                ]),
+            },
+        ]);
+    }
+
     function toggleSelected(id: string) {
         setSelected((prev) => {
             const next = new Set(prev);
@@ -78,13 +106,18 @@ function StudentsView() {
                 title="Students"
                 subtitle={isAdmin ? "Add, edit, or opt-out students." : "View students in each class."}
                 actions={
-                    isAdmin && classId ? (
-                        <button
-                            onClick={() => setShowAdd(true)}
-                            className="rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800"
-                        >
-                            + Add student
-                        </button>
+                    classId ? (
+                        <>
+                            <ExportButton onExport={handleExport} disabled={loading || students.length === 0} />
+                            {isAdmin && (
+                                <button
+                                    onClick={() => setShowAdd(true)}
+                                    className="rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800"
+                                >
+                                    + Add student
+                                </button>
+                            )}
+                        </>
                     ) : null
                 }
             />
@@ -92,7 +125,7 @@ function StudentsView() {
             <div className="flex items-center gap-4 border-b border-neutral-200 bg-white px-8 py-3">
                 <label className="flex items-center gap-2 text-sm text-neutral-700">
                     Class
-                    <ClassSelector value={classId} onChange={setClassId} />
+                    <ClassSelector value={classId} onChange={setClassId} onLoad={onClassesLoaded} />
                 </label>
                 <label className="ml-auto flex items-center gap-2 text-xs text-neutral-600">
                     <input
@@ -155,10 +188,11 @@ function StudentsView() {
                                         </th>
                                     )}
                                     <th className="px-4 py-3">Roll</th>
+                                    <th className="px-4 py-3">Student ID</th>
                                     <th className="px-4 py-3">Name</th>
                                     <th className="px-4 py-3">Parent</th>
                                     <th className="px-4 py-3">Gender</th>
-                                    <th className="px-4 py-3">Contact</th>
+                                    <th className="px-4 py-3">Mobile</th>
                                     <th className="px-4 py-3">Status</th>
                                     {isAdmin && <th className="px-4 py-3"></th>}
                                 </tr>
@@ -177,10 +211,21 @@ function StudentsView() {
                                             </td>
                                         )}
                                         <td className="px-4 py-2 text-neutral-700">{s.rollNo ?? "—"}</td>
+                                        <td className="px-4 py-2 font-mono text-xs text-neutral-900">{s.studentCode ?? "—"}</td>
                                         <td className="px-4 py-2 font-medium text-neutral-900">{s.name}</td>
                                         <td className="px-4 py-2 text-neutral-700">{s.parentName || "—"}</td>
                                         <td className="px-4 py-2 text-neutral-700 capitalize">{s.gender ?? "—"}</td>
-                                        <td className="px-4 py-2 text-neutral-700">{s.contactNumber}</td>
+                                        <td className="px-4 py-2 text-neutral-700">
+                                            {s.contactNumber ? (
+                                                s.contactNumber.split(",").map((n) => (
+                                                    <div key={n} className="whitespace-nowrap tabular-nums">{n.trim()}</div>
+                                                ))
+                                            ) : (
+                                                <span className="text-xs text-amber-700" title="Parents need a mobile number on record to use the app">
+                                                    None — no app access
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="px-4 py-2">
                                             {s.isActive ? (
                                                 <span className="rounded bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800">Active</span>
@@ -191,8 +236,14 @@ function StudentsView() {
                                         {isAdmin && (
                                             <td className="whitespace-nowrap px-4 py-2 text-right">
                                                 <button
-                                                    onClick={() => setMoving([s])}
+                                                    onClick={() => setEditing(s)}
                                                     className="text-xs text-neutral-700 underline hover:text-neutral-900"
+                                                >
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    onClick={() => setMoving([s])}
+                                                    className="ml-3 text-xs text-neutral-700 underline hover:text-neutral-900"
                                                 >
                                                     Move
                                                 </button>
@@ -219,8 +270,21 @@ function StudentsView() {
                 <AddStudentDialog
                     classId={classId}
                     onClose={() => setShowAdd(false)}
-                    onSaved={() => {
+                    onSaved={(student) => {
                         setShowAdd(false);
+                        setMessage(`Added ${student.name} — Student ID ${student.studentCode}.`);
+                        refresh();
+                    }}
+                />
+            )}
+
+            {editing && (
+                <EditStudentDialog
+                    student={editing}
+                    onClose={() => setEditing(null)}
+                    onSaved={(name) => {
+                        setEditing(null);
+                        setMessage(`Saved ${name}.`);
                         refresh();
                     }}
                 />
@@ -476,7 +540,7 @@ function AddStudentDialog({
 }: {
     classId: string;
     onClose: () => void;
-    onSaved: () => void;
+    onSaved: (student: Student) => void;
 }) {
     const [name, setName] = useState("");
     const [parentName, setParentName] = useState("");
@@ -491,16 +555,16 @@ function AddStudentDialog({
         setSaving(true);
         setError(null);
         try {
-            await createStudent({
+            const student = await createStudent({
                 name,
                 parentName,
                 gender,
                 rollNo: rollNo.trim() ? rollNo.trim() : null,
-                contactNumber,
+                contactNumber: formatContactNumbers(contactNumber),
                 classId,
                 admissionYear: currentAcademicYear(),
             });
-            onSaved();
+            onSaved(student);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to save");
             setSaving(false);
@@ -515,7 +579,9 @@ function AddStudentDialog({
             >
                 <div>
                     <h2 className="text-base font-semibold text-neutral-900">Add student</h2>
-                    <p className="mt-1 text-xs text-neutral-500">Roll number is optional.</p>
+                    <p className="mt-1 text-xs text-neutral-500">
+                        Roll number is optional. A Student ID is given automatically.
+                    </p>
                 </div>
 
                 {error && (
@@ -540,12 +606,130 @@ function AddStudentDialog({
                 <Field label="Roll no (optional)">
                     <input value={rollNo} onChange={(e) => setRollNo(e.target.value)} className={inputCls} />
                 </Field>
-                <Field label="Contact number">
-                    <input required value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} className={inputCls} placeholder="+919..." />
+                <Field label="Parents' mobile numbers (one per line)">
+                    <textarea
+                        required
+                        rows={2}
+                        value={contactNumber}
+                        onChange={(e) => setContactNumber(e.target.value)}
+                        className={inputCls}
+                        placeholder="9876543210"
+                    />
                 </Field>
 
                 <div className="flex justify-end gap-2 pt-2">
                     <button type="button" onClick={onClose} className="rounded px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100">
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={saving}
+                        className="rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+                    >
+                        {saving ? "Saving…" : "Save"}
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+}
+
+/** Edit a student's details. Their mobile numbers are what parents sign in to the app with. */
+function EditStudentDialog({
+    student,
+    onClose,
+    onSaved,
+}: {
+    student: Student;
+    onClose: () => void;
+    onSaved: (name: string) => void;
+}) {
+    const [name, setName] = useState(student.name);
+    const [parentName, setParentName] = useState(student.parentName);
+    const [gender, setGender] = useState<Gender | "">(student.gender ?? "");
+    const [rollNo, setRollNo] = useState(student.rollNo ?? "");
+    const [mobiles, setMobiles] = useState(
+        student.contactNumber
+            .split(",")
+            .map((n) => n.trim())
+            .filter(Boolean)
+            .join("\n")
+    );
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        setSaving(true);
+        setError(null);
+        try {
+            const trimmed = name.trim().replace(/\s+/g, " ");
+            if (!trimmed) throw new Error("Enter the student's name.");
+            await updateStudent(student.id, {
+                name: trimmed,
+                parentName: parentName.trim(),
+                gender: gender || null,
+                rollNo: rollNo.trim() || null,
+                contactNumber: formatContactNumbers(mobiles),
+            });
+            onSaved(trimmed);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to save");
+            setSaving(false);
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <form onSubmit={handleSubmit} className="w-full max-w-md space-y-4 rounded-lg bg-white p-6 shadow-xl">
+                <div>
+                    <h2 className="text-base font-semibold text-neutral-900">Edit {student.name}</h2>
+                    <p className="mt-1 text-xs text-neutral-500">
+                        Student ID <span className="font-mono font-medium text-neutral-800">{student.studentCode ?? "—"}</span>.
+                        Parents sign in to the app with this ID and any mobile number below.
+                    </p>
+                </div>
+
+                {error && (
+                    <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{error}</div>
+                )}
+
+                <Field label="Full name">
+                    <input required value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
+                </Field>
+                <Field label="Parent name">
+                    <input value={parentName} onChange={(e) => setParentName(e.target.value)} className={inputCls} />
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                    <Field label="Gender">
+                        <select value={gender} onChange={(e) => setGender(e.target.value as Gender | "")} className={inputCls}>
+                            <option value="">Not recorded</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </Field>
+                    <Field label="Roll no">
+                        <input value={rollNo} onChange={(e) => setRollNo(e.target.value)} className={inputCls} />
+                    </Field>
+                </div>
+                <Field label="Parents' mobile numbers (one per line)">
+                    <textarea
+                        rows={3}
+                        value={mobiles}
+                        onChange={(e) => setMobiles(e.target.value)}
+                        className={inputCls}
+                        placeholder="9876543210"
+                    />
+                </Field>
+
+                <div className="flex justify-end gap-2 pt-2">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={saving}
+                        className="rounded px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+                    >
                         Cancel
                     </button>
                     <button

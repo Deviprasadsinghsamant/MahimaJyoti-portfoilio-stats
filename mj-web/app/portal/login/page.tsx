@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signInWithPhone } from "@/lib/auth";
@@ -48,6 +49,15 @@ function LoginForm() {
                 className="w-full max-w-sm space-y-5 rounded-lg border border-neutral-200 bg-white p-6 shadow-sm"
             >
                 <div>
+                    <Image
+                        src="/logo.png"
+                        alt="Mahima Jyoti Awasika Vidyapitha logo"
+                        width={72}
+                        height={72}
+                        unoptimized
+                        priority
+                        className="mb-3 h-[72px] w-[72px]"
+                    />
                     <h1 className="text-lg font-semibold text-neutral-900">MahimaJyoti Portal</h1>
                     <p className="mt-1 text-sm text-neutral-600">Sign in with your phone number.</p>
                 </div>

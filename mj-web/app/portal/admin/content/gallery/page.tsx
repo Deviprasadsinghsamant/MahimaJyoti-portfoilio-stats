@@ -5,6 +5,7 @@ import { RoleGate } from "@/components/portal/RoleGate";
 import { PageHeader } from "@/components/portal/PageHeader";
 import { Card } from "@/components/portal/ui/Card";
 import { Badge } from "@/components/portal/ui/Badge";
+import { Field as HelpField, InfoTip } from "@/components/portal/admin/Help";
 import { ImageField } from "@/components/portal/admin/ImageField";
 import {
     listGalleryAdmin,
@@ -14,13 +15,14 @@ import {
 } from "@/lib/portal/content";
 import type { GalleryCategory, GalleryItem } from "@/domain/portal/content-types";
 
-const CATEGORIES: { value: GalleryCategory; label: string }[] = [
-    { value: "campus", label: "Campus" },
-    { value: "events", label: "Events" },
-    { value: "academics", label: "Academics" },
-    { value: "sports", label: "Sports" },
-    { value: "achievements", label: "Achievements" },
-    { value: "cultural", label: "Cultural" },
+// Visitors filter the gallery by these. aim: how many shown photos make the category look full.
+const CATEGORIES: { value: GalleryCategory; label: string; aim: [number, number]; what: string }[] = [
+    { value: "campus", label: "Campus", aim: [6, 10], what: "Buildings, classrooms, hostel, dining hall, grounds — the place itself." },
+    { value: "events", label: "Events", aim: [6, 12], what: "Annual day, Independence & Republic Day, prize distribution, visits." },
+    { value: "academics", label: "Academics", aim: [4, 8], what: "Classes in progress, labs, library, projects, exhibitions." },
+    { value: "sports", label: "Sports", aim: [4, 8], what: "Sports day, matches, practice, yoga, games period." },
+    { value: "achievements", label: "Achievements", aim: [3, 6], what: "Prize winners, trophies, certificates, board toppers (with permission)." },
+    { value: "cultural", label: "Cultural", aim: [4, 8], what: "Dance, music, drama, festivals, art and craft." },
 ];
 
 const ACCENT_OPTIONS = [
@@ -68,13 +70,13 @@ function GalleryAdminView() {
             <PageHeader
                 eyebrow="Portfolio content"
                 title="Gallery"
-                subtitle="Images shown on /gallery. Only active items are visible to visitors."
+                subtitle="Photos on the website's Gallery page, grouped by category. Add one photo at a time with “+ Add photo”."
                 actions={
                     <button
                         onClick={() => setEditing("new")}
                         className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
                     >
-                        + Add item
+                        + Add photo
                     </button>
                 }
             />
@@ -84,12 +86,44 @@ function GalleryAdminView() {
                     <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
                 )}
 
-                <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
-                    <span className="font-semibold uppercase tracking-widest text-slate-500">Filter</span>
-                    <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>All</FilterChip>
-                    {CATEGORIES.map((c) => (
-                        <FilterChip key={c.value} active={filter === c.value} onClick={() => setFilter(c.value)}>{c.label}</FilterChip>
-                    ))}
+                <GalleryGuide items={items} />
+
+                <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {CATEGORIES.map((c) => {
+                        const shown = items.filter((i) => i.category === c.value && i.isActive).length;
+                        const [min, max] = c.aim;
+                        const tone = shown === 0 ? "text-slate-500" : shown < min ? "text-amber-700" : shown > max ? "text-slate-700" : "text-emerald-700";
+                        return (
+                            <button
+                                key={c.value}
+                                type="button"
+                                onClick={() => setFilter(filter === c.value ? "all" : c.value)}
+                                aria-pressed={filter === c.value}
+                                className={
+                                    "rounded-lg border p-3 text-left transition-colors " +
+                                    (filter === c.value ? "border-blue-500 bg-blue-50" : "border-slate-200 bg-white hover:bg-slate-50")
+                                }
+                            >
+                                <span className="flex items-center justify-between gap-2">
+                                    <span className="text-sm font-semibold text-slate-900">{c.label}</span>
+                                    <span className={`text-xs font-semibold ${tone}`}>
+                                        {shown} shown · aim {min}–{max}{shown >= min && shown <= max ? " ✓" : ""}
+                                    </span>
+                                </span>
+                                <span className="mt-1 block text-[11px] leading-snug text-slate-500">{c.what}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+                <div className="mb-4 flex items-center gap-2 text-xs text-slate-500">
+                    {filter === "all" ? (
+                        "Showing all photos — tap a category above to see only that one."
+                    ) : (
+                        <>
+                            Showing <strong className="text-slate-700">{CATEGORIES.find((c) => c.value === filter)?.label}</strong> only.
+                            <FilterChip active={false} onClick={() => setFilter("all")}>Show all</FilterChip>
+                        </>
+                    )}
                 </div>
 
                 {loading ? (
@@ -205,38 +239,41 @@ function EditDialog({
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
             <form onSubmit={handleSubmit} className="my-8 w-full max-w-lg space-y-4 rounded-xl bg-white p-6 shadow-xl">
                 <h2 className="text-base font-semibold text-slate-900">
-                    {existing ? "Edit gallery item" : "New gallery item"}
+                    {existing ? "Edit photo" : "Add a photo"}
                 </h2>
                 {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{error}</div>}
 
-                <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-700">Photo</label>
-                    <ImageField subpath="gallery" value={photoUrl} onChange={setPhotoUrl} />
-                </div>
+                <HelpField as="div" label="Photo" info="Landscape photos work best. The thumbnail is cropped to 4:3; visitors who open it see the whole photo.">
+                    <ImageField slot="gallery" subpath="gallery" value={photoUrl} onChange={setPhotoUrl} />
+                </HelpField>
 
-                <Field label="Title"><input required value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} /></Field>
-                <Field label="Description">
-                    <textarea required value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className={inputCls} />
-                </Field>
+                <HelpField label="Title" hint="A short caption, e.g. “Annual Sports Day 2026”.">
+                    <input required value={title} onChange={(e) => setTitle(e.target.value)} maxLength={60} className={inputCls} placeholder="Annual Sports Day 2026" />
+                </HelpField>
+                <HelpField label="Description" hint="One sentence shown when the photo is opened.">
+                    <textarea required value={description} onChange={(e) => setDescription(e.target.value)} rows={2} maxLength={200} className={inputCls} placeholder="Class VIII students in the 100 m relay final." />
+                </HelpField>
 
                 <div className="grid grid-cols-2 gap-3">
-                    <Field label="Category">
+                    <HelpField label="Category" hint={CATEGORIES.find((c) => c.value === category)?.what}>
                         <select value={category} onChange={(e) => setCategory(e.target.value as GalleryCategory)} className={inputCls}>
                             {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                         </select>
-                    </Field>
-                    <Field label="Sort order"><input type="number" value={order} onChange={(e) => setOrder(Number(e.target.value) || 0)} className={inputCls} /></Field>
+                    </HelpField>
+                    <HelpField label="Position" hint="Lower numbers appear first.">
+                        <input type="number" value={order} onChange={(e) => setOrder(Number(e.target.value) || 0)} className={inputCls} />
+                    </HelpField>
                 </div>
 
-                <Field label="Fallback accent (used when no photo uploaded)">
+                <HelpField label="Colour if no photo" hint="Only used while there's no photo — normally you can ignore this.">
                     <select value={accent} onChange={(e) => setAccent(e.target.value)} className={inputCls}>
                         {ACCENT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
-                </Field>
+                </HelpField>
 
                 <label className="flex items-center gap-2 text-xs text-slate-700">
                     <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-                    Show on public /gallery page
+                    Show this photo on the website (untick to hide it without deleting)
                 </label>
 
                 <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
@@ -251,6 +288,27 @@ function EditDialog({
 }
 
 const inputCls = "w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500";
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-    return <label className="block text-xs font-medium text-slate-700"><span className="mb-1 block">{label}</span>{children}</label>;
+
+/** What a full, healthy gallery looks like. */
+function GalleryGuide({ items }: { items: GalleryItem[] }) {
+    const shown = items.filter((i) => i.isActive).length;
+    return (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-sm text-blue-950">
+            <span className="font-semibold">
+                {shown} photo{shown === 1 ? "" : "s"} on the website · aim for 25–40 in total
+            </span>
+            <InfoTip label="About the gallery">
+                <strong>What to upload:</strong> your best, clearest photos — one or two per event, not every shot. Landscape,
+                1600 × 1200 px or larger (any size is resized automatically).
+                <br />
+                <strong>How many:</strong> each category below shows its target. 25–40 photos in total keeps the page full but
+                quick to load.
+                <br />
+                <strong>Keep it fresh:</strong> each term, add new event photos and hide or delete old ones.
+                <br />
+                <strong>Permission:</strong> get parents&apos; consent before showing students, and don&apos;t put children&apos;s
+                full names in captions.
+            </InfoTip>
+        </div>
+    );
 }

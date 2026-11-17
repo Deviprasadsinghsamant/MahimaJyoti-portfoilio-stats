@@ -1,29 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RoleGate } from "@/components/portal/RoleGate";
 import { ClassSelector } from "@/components/portal/ClassSelector";
+import { ExportButton } from "@/components/portal/ExportButton";
 import { useAuth } from "@/components/portal/AuthContext";
 import {
     listStudents,
     listSubjects,
     listResults,
+    listExamResults,
     upsertResult,
 } from "@/lib/portal/data";
-import { EXAM_TYPES, currentAcademicYear } from "@/lib/portal/academic";
+import { EXAM_TYPES, currentAcademicYear, examLabel } from "@/lib/portal/academic";
+import { examSheet, exportWorkbook, fileSlug, sittingName, type ExportSheet } from "@/lib/portal/exportExcel";
 import type {
     ExamType,
     Result,
+    SchoolClass,
     Student,
     Subject,
 } from "@/domain/portal/types";
 
 // Max marks offered when a sitting has no results yet. Classes IX–X use 50
 // for Internal Assessments and 100 for Summatives; change "Total" there.
+// Subject tests vary — set "Total" to whatever the test was out of.
 const DEFAULT_TOTALS: Record<ExamType, number> = {
     baseline: 25,
     "internal-assessment": 25,
     summative: 50,
+    "subject-test": 20,
 };
 
 export default function ResultsPage() {
@@ -39,6 +45,8 @@ function ResultsView() {
     const canEdit = role === "admin" || role === "teacher" || role === "staff";
 
     const [classId, setClassId] = useState<string | null>(null);
+    const [classes, setClasses] = useState<SchoolClass[]>([]);
+    const onClassesLoaded = useCallback((list: SchoolClass[]) => setClasses(list), []);
     const [subjectId, setSubjectId] = useState<string | null>(null);
     const [examType, setExamType] = useState<ExamType>("internal-assessment");
     const [examNumber, setExamNumber] = useState<number>(1);
@@ -46,6 +54,8 @@ function ResultsView() {
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
     const [marks, setMarks] = useState<Record<string, string>>({});
+    // Mark boxes in roll order, so Enter can move to the next student.
+    const markInputs = useRef<(HTMLInputElement | null)[]>([]);
     const [totalMarks, setTotalMarks] = useState<number>(25);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -111,6 +121,49 @@ function ResultsView() {
         [subjects, subjectId]
     );
 
+    // Enter moves to the next student's mark (Shift+Enter to the previous one) with
+    // its value selected, so a whole class can be typed without the mouse.
+    function handleMarkKeyDown(e: React.KeyboardEvent<HTMLInputElement>, index: number) {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        const target = markInputs.current[index + (e.shiftKey ? -1 : 1)];
+        if (!target) {
+            e.currentTarget.blur(); // last student: done
+            return;
+        }
+        target.focus({ preventScroll: true });
+        target.select();
+        // Centred, so neither the sticky header nor the mobile save bar covers it.
+        target.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+
+    // This subject's marks as shown, plus — for a school-wide exam — the class's
+    // mark sheet for the same sitting with every subject.
+    async function handleExport() {
+        if (!classId || !currentSubject) return;
+        const className = classes.find((c) => c.id === classId)?.name ?? "Class";
+        const sitting =
+            examType === "subject-test"
+                ? `${currentSubject.name} ${examLabel(examType)} ${examNumber}`
+                : `${examLabel(examType)}${examType === "baseline" ? "" : ` ${examNumber}`}`;
+        const subjectSheet: ExportSheet = {
+            name: currentSubject.name,
+            header: ["Roll", "Student", "Student ID", `Marks (out of ${totalMarks})`, "%"],
+            rows: students.map((s) => {
+                const raw = marks[s.id];
+                const n = raw === undefined || raw === "" ? null : Number(raw);
+                return [s.rollNo ?? "", s.name, s.studentCode ?? "", n, n === null || !totalMarks ? null : n / totalMarks];
+            }),
+            percentColumns: [4],
+        };
+        const sheets = [subjectSheet];
+        if (examType !== "subject-test") {
+            const all = await listExamResults(classId, examType, examNumber, currentAcademicYear());
+            sheets.push(examSheet(`${sittingName(examType, examNumber)} all subjects`, students, subjects, all));
+        }
+        await exportWorkbook(`${fileSlug(className)}_${fileSlug(sitting)}`, sheets);
+    }
+
     async function handleSave() {
         if (!classId || !subjectId || !firebaseUser || !currentSubject) return;
         setSaving(true);
@@ -155,22 +208,32 @@ function ResultsView() {
                 <div className="flex items-center justify-between px-4 py-3 md:px-8">
                     <div>
                         <h1 className="text-base font-semibold text-neutral-900 md:text-lg">Results</h1>
-                        <p className="text-xs text-neutral-500">Enter marks per student for the selected exam.</p>
+                        <p className="text-xs text-neutral-500">
+                            {examType === "subject-test"
+                                ? `Subject tests are numbered per subject: ${currentSubject?.name ?? "Mathematics"} Test 1, 2, …`
+                                : "Enter marks per student for the selected exam."}{" "}
+                            Press Enter to move to the next student.
+                        </p>
                     </div>
-                    {canEdit && classId && subjectId && (
-                        <button
-                            onClick={handleSave}
-                            disabled={saving || loading}
-                            className="hidden rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50 md:inline-block"
-                        >
-                            {saving ? "Saving…" : "Save all"}
-                        </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {classId && subjectId && (
+                            <ExportButton onExport={handleExport} disabled={loading || students.length === 0} />
+                        )}
+                        {canEdit && classId && subjectId && (
+                            <button
+                                onClick={handleSave}
+                                disabled={saving || loading}
+                                className="hidden rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50 md:inline-block"
+                            >
+                                {saving ? "Saving…" : "Save all"}
+                            </button>
+                        )}
+                    </div>
                 </div>
                 <div className="flex flex-wrap gap-3 border-t border-neutral-100 px-4 py-2 text-sm md:px-8">
                     <label className="flex items-center gap-2 text-neutral-700">
                         <span className="text-xs uppercase text-neutral-500">Class</span>
-                        <ClassSelector value={classId} onChange={setClassId} />
+                        <ClassSelector value={classId} onChange={setClassId} onLoad={onClassesLoaded} />
                     </label>
                     <label className="flex items-center gap-2 text-neutral-700">
                         <span className="text-xs uppercase text-neutral-500">Subject</span>
@@ -255,28 +318,46 @@ function ResultsView() {
                 ) : (
                     <div className="overflow-hidden rounded border border-neutral-200 bg-white">
                         <ul className="divide-y divide-neutral-100">
-                            {students.map((s) => (
-                                <li key={s.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                                    <div className="flex min-w-0 items-center gap-3">
-                                        <span className="w-8 shrink-0 text-xs text-neutral-500">{s.rollNo ?? "—"}</span>
-                                        <span className="truncate text-sm text-neutral-900">{s.name}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="number"
-                                            inputMode="numeric"
-                                            min={0}
-                                            max={totalMarks}
-                                            value={marks[s.id] ?? ""}
-                                            onChange={(e) => setMarks((m) => ({ ...m, [s.id]: e.target.value }))}
-                                            disabled={!canEdit}
-                                            className="w-20 rounded border border-neutral-300 px-2 py-1.5 text-right text-sm outline-none focus:border-neutral-900"
-                                            placeholder="—"
-                                        />
-                                        <span className="text-xs text-neutral-500">/{totalMarks}</span>
-                                    </div>
-                                </li>
-                            ))}
+                            {students.map((s, i) => {
+                                const value = marks[s.id] ?? "";
+                                const n = Number(value);
+                                // Out of range shows at once, not only when saving.
+                                const invalid = value !== "" && (Number.isNaN(n) || n < 0 || n > totalMarks);
+                                return (
+                                    <li key={s.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            <span className="w-8 shrink-0 text-xs text-neutral-500">{s.rollNo ?? "—"}</span>
+                                            <span className="truncate text-sm text-neutral-900">{s.name}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                ref={(el) => {
+                                                    markInputs.current[i] = el;
+                                                }}
+                                                type="number"
+                                                inputMode="numeric"
+                                                enterKeyHint={i === students.length - 1 ? "done" : "next"}
+                                                min={0}
+                                                max={totalMarks}
+                                                value={value}
+                                                onChange={(e) => setMarks((m) => ({ ...m, [s.id]: e.target.value }))}
+                                                onKeyDown={(e) => handleMarkKeyDown(e, i)}
+                                                disabled={!canEdit}
+                                                aria-label={`${s.name} marks out of ${totalMarks}`}
+                                                aria-invalid={invalid}
+                                                className={
+                                                    "w-20 rounded border px-2 py-1.5 text-right text-sm outline-none " +
+                                                    (invalid
+                                                        ? "border-red-500 bg-red-50 focus:border-red-600"
+                                                        : "border-neutral-300 focus:border-neutral-900")
+                                                }
+                                                placeholder="—"
+                                            />
+                                            <span className="text-xs text-neutral-500">/{totalMarks}</span>
+                                        </div>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     </div>
                 )}

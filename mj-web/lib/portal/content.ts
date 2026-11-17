@@ -126,12 +126,16 @@ export async function deleteGalleryItem(id: string): Promise<void> {
 
 // ─── Site content (single doc per page) ──────────────
 
+// Memoised for a few minutes: the footer and the page itself can ask for the
+// same document, and moving between pages shouldn't re-read it every time.
 export async function getSiteContent<K extends SiteContentPageId>(
     pageId: K
 ): Promise<SiteContentByPage[K] | null> {
-    const snap = await getDoc(doc(db(), "siteContent", pageId));
-    if (!snap.exists()) return null;
-    return snap.data() as SiteContentByPage[K];
+    return memo(`site:${pageId}`, async () => {
+        const snap = await getDoc(doc(db(), "siteContent", pageId));
+        if (!snap.exists()) return null;
+        return snap.data() as SiteContentByPage[K];
+    });
 }
 
 export async function saveSiteContent<K extends SiteContentPageId>(
@@ -139,9 +143,11 @@ export async function saveSiteContent<K extends SiteContentPageId>(
     content: SiteContentByPage[K]
 ): Promise<void> {
     await withTokenRetry(async () => {
+        // JSON round trip drops unset optional fields — Firestore rejects `undefined`.
         await setDoc(doc(db(), "siteContent", pageId), {
-            ...content,
+            ...JSON.parse(JSON.stringify(content)),
             updatedAt: Date.now(),
         });
+        invalidate(`site:${pageId}`);
     });
 }

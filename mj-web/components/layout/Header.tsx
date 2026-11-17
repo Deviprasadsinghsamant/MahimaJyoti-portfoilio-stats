@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Menu, X, GraduationCap } from "lucide-react";
+import Image from "next/image";
+import { Menu, X } from "lucide-react";
 import { clsx } from "clsx";
 
 const navLinks = [
@@ -41,9 +42,15 @@ export function Header() {
                 <div className="flex items-center justify-between h-18 md:h-20">
                     {/* Logo */}
                     <Link href="/" className="flex items-center gap-3 group">
-                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center shadow-lg shadow-gold-500/25 group-hover:shadow-gold-500/40 transition-shadow">
-                            <GraduationCap className="w-6 h-6 md:w-7 md:h-7 text-navy-950" />
-                        </div>
+                        <Image
+                            src="/logo.png"
+                            alt="Mahima Jyoti Awasika Vidyapitha logo"
+                            width={48}
+                            height={48}
+                            unoptimized
+                            priority
+                            className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white shadow-lg shadow-gold-500/25 group-hover:shadow-gold-500/40 transition-shadow"
+                        />
                         <div className="flex flex-col">
                             <span className="text-lg md:text-xl font-heading font-bold text-white leading-tight tracking-tight">
                                 MahimaJyoti

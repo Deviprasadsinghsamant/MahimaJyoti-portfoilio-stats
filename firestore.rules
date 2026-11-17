@@ -79,12 +79,13 @@ service cloud.firestore {
         || (isStaffOrTeacher() && resource.data.teacherId == request.auth.uid);
     }
 
-    // Attendance — teachers and staff mark and edit any record; admin can delete.
-    // Attendance is a shared classroom record, not owned by the original marker.
+    // Attendance — one register per class per day ({classId}_{date}). Saved only
+    // through the saveAttendance function, which allows a class's class teacher
+    // (or an admin), limits teachers to recent days, and updates the students'
+    // attendanceSummary docs and parents' phones in the same step.
     match /attendance/{attendanceId} {
       allow read: if isPortalUser();
-      allow create, update: if isStaffOrTeacher() || isAdmin();
-      allow delete: if isAdmin();
+      allow write: if false;
     }
 
     // Results — staff and teachers upload; only uploader or admin can edit.
@@ -102,6 +103,26 @@ service cloud.firestore {
       allow update, delete: if isAdmin()
         || (isTeacher() && resource.data.uploadedBy == request.auth.uid);
     }
+
+    // Messages from the website's contact form. Created only by the
+    // submitContactMessage function (it validates and rate-limits); admins read
+    // them, mark them read / unread, and delete them.
+    match /contactMessages/{messageId} {
+      allow read, delete: if isAdmin();
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+        && request.resource.data.read is bool;
+      allow create: if false;
+    }
+
+    // Counters — counters/studentCode numbers new students' Student IDs.
+    match /counters/{counterId} {
+      allow read, write: if isAdmin();
+    }
+
+    // parentDevices, parentLoginAttempts, parentFeeds (the parent app),
+    // attendanceSummary and contactRateLimits are only touched by Cloud Functions,
+    // so they fall through to the deny below.
 
     // Deny everything else by default.
     match /{document=**} {
