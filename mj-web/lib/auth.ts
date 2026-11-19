@@ -68,6 +68,8 @@ export async function withTokenRetry<T>(fn: () => Promise<T>): Promise<T> {
 
 export async function getUserRole(user: User): Promise<UserRole | null> {
     const tokenResult = await user.getIdTokenResult();
+    // The demo login for app-store reviewers works in the app only.
+    if (tokenResult.claims.demo === true) return null;
     const role = tokenResult.claims.role;
     if (role === "admin" || role === "teacher" || role === "staff") {
         return role;

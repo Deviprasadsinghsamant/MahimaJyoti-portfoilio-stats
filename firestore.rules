@@ -11,16 +11,23 @@ service cloud.firestore {
       return request.auth.token.role;
     }
 
+    // The demo login for app-store reviewers (scripts/demo-review.ts) works only
+    // through the app's Cloud Functions, which show it demo data alone. It gets
+    // no direct access, so it can't see real students on the website.
+    function isDemo() {
+      return request.auth.token.get('demo', false) == true;
+    }
+
     function isAdmin() {
-      return isSignedIn() && role() == 'admin';
+      return isSignedIn() && role() == 'admin' && !isDemo();
     }
 
     function isTeacher() {
-      return isSignedIn() && role() == 'teacher';
+      return isSignedIn() && role() == 'teacher' && !isDemo();
     }
 
     function isStaff() {
-      return isSignedIn() && role() == 'staff';
+      return isSignedIn() && role() == 'staff' && !isDemo();
     }
 
     function isStaffOrTeacher() {

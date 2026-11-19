@@ -10,6 +10,9 @@ export interface Caller {
     role: UserRole;
     // The account's display name (set when the login is created); may be empty.
     name: string;
+    // The demo login for app-store reviewers (custom claim `demo`): limited to
+    // demo classes and students. See scripts/demo-review.ts.
+    demo: boolean;
 }
 
 export function requirePortalUser(request: CallableRequest): Caller {
@@ -21,5 +24,5 @@ export function requirePortalUser(request: CallableRequest): Caller {
         throw new HttpsError("permission-denied", "This needs a school staff login.");
     }
     const name = typeof request.auth.token.name === "string" ? request.auth.token.name : "";
-    return { uid: request.auth.uid, role, name };
+    return { uid: request.auth.uid, role, name, demo: request.auth.token.demo === true };
 }

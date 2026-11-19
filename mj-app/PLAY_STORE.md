@@ -1,6 +1,6 @@
 # Publishing Mahima Jyoti on Google Play
 
-What to upload: **`mj-app/dist/MahimaJyoti-1.0.2.aab`** — version 1.0.2 (versionCode 3),
+What to upload: **`mj-app/dist/MahimaJyoti-1.0.3.aab`** — version 1.0.3 (versionCode 4),
 package `com.mahimajyoti.app`, signed with your upload key. The Cloud Functions it needs are
 already deployed.
 
@@ -10,20 +10,36 @@ Work through the parts in order. Parts 1–3 are one-time; part 4 is every relea
 
 ## 1. Before you start: demo logins for Google's reviewers
 
-Google reviews every release and **needs a working login for each kind of user**. Never give
-them a real student's ID or a real teacher's password — set up demo ones in the portal:
+Google reviews every release and **needs a working login for each kind of user**, and they
+must never see a real child. The demo data is already created by `scripts/demo-review.ts`
+(`npm run demo:review` in `scripts/`; `-- --remove --yes` deletes it all):
 
-1. **A demo class** — *Classes & Sections*: e.g. *Demo (Google review)*, with one or two
-   subjects on the *Subjects* page. Keeping the demo apart means real classes and lists aren't
-   touched (it will show up as its own class in KPIs; skip it in Annual Promotion).
-2. **A demo student** in that class — *Students*: name *Demo Student*, and as contact number a
-   mobile the school owns (e.g. the office mobile). Note the **Student ID** the portal gives it
-   (e.g. `MJ0999`).
-3. **A few results** for the demo student (*Results*), so the reviewer sees marks.
-4. **A demo teacher login** — *Staff & Teachers*: a teacher with a phone number and password
-   you choose, made **class teacher of the demo class only**. The password must not expire.
+| Login | What to give Google |
+|---|---|
+| **Parent** | Student ID **`MJ9001`** · mobile number **`6000000002`** |
+| **Teacher** | phone **`6000000001`** · the password **you** set (see below) |
 
-Keep these four things for as long as the app is on Play: every update is reviewed again.
+- **Class Demo** — five subjects, *Demo Student* with marks for every exam this year
+  (Baseline, Internal Assessments 1–2, Summative 1, two subject tests) and a month of
+  attendance with one absence. The Demo Teacher is its class teacher.
+- **Kept completely apart from the school.** The demo lives in its own collections
+  (`demoClasses`, `demoStudents`, `demoResults`, …), never in the school's. The website and
+  the real app read only the school's, so the demo appears nowhere for you, the teachers or
+  the parents — not in Staff & Teachers, class lists, KPIs, exports or promotion. Only the
+  two demo logins see it, and they see nothing else: the demo teacher can't open a real
+  student and the website refuses it.
+- The numbers are dummies — nobody receives calls or messages on them.
+
+**One step for you — the teacher password.** The demo teacher login was created without
+one. In a terminal, in the project's `scripts` folder, run:
+
+```bash
+npm run demo:review -- --password
+```
+
+Type the password twice (8+ characters; it isn't shown on screen or saved anywhere by the
+script). Use the same password in *App access* below, and keep it while the app is on Play:
+every update is reviewed again.
 
 ## 2. Create the app in Play Console (skip if `com.mahimajyoti.app` already exists)
 
@@ -33,7 +49,7 @@ Keep these four things for as long as the app is on Play: every update is review
    - App or game: **App** · Free or paid: **Free**
    - Tick the declarations → **Create app**.
 2. The package name is fixed by the first bundle you upload, so upload only
-   `MahimaJyoti-1.0.2.aab` (package `com.mahimajyoti.app`).
+   `MahimaJyoti-1.0.3.aab` (package `com.mahimajyoti.app`).
 3. If an earlier app shows `in.mahimajyoti.package`, leave it unpublished or delete it
    (that app → *Settings → Advanced settings → Delete app*). It doesn't affect the new one.
 
@@ -56,12 +72,12 @@ Answer each task as below, then **Save**.
 
 **App access — instructions** (in English, using your demo logins):
 
-- *Parent*: “On the first screen tap **Parent → Sign in**. Student ID: `MJ0999`. Mobile number:
-  `<demo student's number>`. Results and Attendance are on the child's screen; tap an exam for
-  subject-wise marks.”
-- *Teacher*: “On the first screen tap **Teacher → Sign in**. Phone: `<demo teacher phone>`.
-  Password: `<demo teacher password>`. Today's attendance for the demo class is on the home
-  screen; tap a student's name in a class to see their marks.”
+- *Parent* — username `MJ9001`, password `6000000002`, instructions: “On the first screen tap
+  **Parent → Sign in**. Enter Student ID MJ9001 and mobile number 6000000002. Results and
+  Attendance are on the child's screen; tap an exam for subject-wise marks.”
+- *Teacher* — username `6000000001`, password: the one you set, instructions: “On the first
+  screen tap **Teacher → Sign in** with phone 6000000001 and this password. Today's attendance
+  for the demo class is on the home screen; open the class and tap Demo Student to see marks.”
 
 **Data safety** — the honest answers for this app:
 
@@ -99,9 +115,10 @@ Answer each task as below, then **Save**.
   > Your child's records come only from the school. The app works offline once loaded.
 - **App icon**: `mj-app/store/play-icon-512.png` · **Feature graphic**:
   `mj-app/store/feature-graphic.png`
-- **Phone screenshots** (at least 2): signed in as the **demo** student and teacher — the
-  Welcome screen, a child's Results list, an exam's subject-wise marks, the attendance
-  calendar, the teacher home. Never show a real student.
+- **Phone screenshots**: upload all five from `mj-app/store/screenshots/`, in order —
+  `1-welcome`, `2-my-child`, `3-results`, `4-subject-marks`, `5-attendance`. They're
+  1350×2400 (9:16, as Play wants) and show only the demo student. To make new ones, sign in
+  with the demo logins only — never show a real student.
 
 ## 4. Release
 
@@ -111,7 +128,7 @@ Answer each task as below, then **Save**.
    Gmail addresses of a few staff → **Save**.
 2. **Create new release.** On the very first release Play asks about **app signing**: keep
    *Google-generated key* (recommended) — your upload key stays as is.
-3. **Upload** `MahimaJyoti-1.0.2.aab`. Release name fills in as `3 (1.0.2)`.
+3. **Upload** `MahimaJyoti-1.0.3.aab`. Release name fills in as `4 (1.0.3)`.
 4. **Release notes** (en-IN):
 
    ```
@@ -135,7 +152,7 @@ for production. (Organisation accounts skip to 4d.)
 1. **Testing → Closed testing → Create track** (or use *Closed testing – Alpha*).
 2. **Countries / regions**: India. **Testers**: an email list (or Google Group) with **at
    least 12 people** — teachers and a few parents with Gmail accounts.
-3. **Create new release → Add from library →** the 1.0.2 bundle you uploaded → same notes →
+3. **Create new release → Add from library →** the 1.0.3 bundle you uploaded → same notes →
    **Next → Save → Send for review**. The first review can take a few days.
 4. Send testers the join link. Each one taps **Become a tester**, then installs from Play and
    **actually uses the app** over the 14 days. Google checks engagement, not just the count.
@@ -149,7 +166,7 @@ Google replies in about a week. If it says no, the closed test simply continues.
 ### 4d. Production rollout
 
 1. **Production → Countries / regions**: add India.
-2. **Create new release → Add from library →** 1.0.2 → release notes → **Next**.
+2. **Create new release → Add from library →** 1.0.3 → release notes → **Next**.
 3. **Rollout percentage**: start at **20%**, watch *Quality → Android vitals* and reviews for a
    day or two, then **Increase rollout** to 100%.
 4. **Publishing overview → Send changes for review.** Once approved, it's live.

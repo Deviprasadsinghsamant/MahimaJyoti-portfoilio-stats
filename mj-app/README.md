@@ -156,13 +156,18 @@ without them they fall back to the debug key (fine for test phones, refused by P
 the app never uses (draw over other apps, storage), so Play lists only what's needed:
 internet, notifications, vibration and what Firebase messaging requires.
 
+The app is locked to portrait, which Android turns into a *required* portrait-screen
+feature; Play refuses to review an app that requires it (it hides the app from tablets,
+Chromebooks and Android XR). `plugins/withOptionalPortraitScreen.js` declares the feature
+as not required, so phones stay portrait and every device can install it.
+
 The full Play Console walk-through (demo logins for reviewers, store listing, data safety,
 testing tracks, rollout) is in [`PLAY_STORE.md`](PLAY_STORE.md).
 
 **Every release:**
 
 1. In `app.json`, raise `expo.android.versionCode` by 1 (Play rejects a repeated number) and
-   set `expo.version` to the version shown to users (e.g. `1.0.2`). Deploy any Cloud
+   set `expo.version` to the version shown to users (e.g. `1.0.3`). Deploy any Cloud
    Function changes the new version relies on **before** rolling it out (older app
    versions keep working with newer functions).
 2. Build the bundle:

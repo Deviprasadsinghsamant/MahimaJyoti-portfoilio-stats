@@ -9,7 +9,8 @@
     "school:apply": "ts-node seed-school.ts apply",
     "school:sections": "ts-node assign-sections.ts",
     "school:subjects": "ts-node sync-subjects.ts",
-    "school:codes": "ts-node assign-student-codes.ts"
+    "school:codes": "ts-node assign-student-codes.ts",
+    "demo:review": "ts-node demo-review.ts"
   },
   "dependencies": {
     "firebase-admin": "^12.0.0"

@@ -16,6 +16,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { requirePortalUser } from "../../shared/callableAuth";
+import { dataSpace, dataSpaceOfStudent } from "../../shared/dataSpace";
 import { addDays, dayPhrase, isIsoDate, istToday } from "../../shared/dates";
 import { db } from "../../shared/firestore";
 import type { Attendance, AttendanceMark, AttendanceRecord, SchoolClass, Student } from "../../shared/types";
@@ -94,7 +95,7 @@ function diff(previous: AttendanceRecord[], next: AttendanceRecord[]): Change[] 
 
 async function firstNames(studentIds: string[]): Promise<Map<string, string>> {
     if (studentIds.length === 0) return new Map();
-    const docs = await db.getAll(...studentIds.map((id) => db.collection("students").doc(id)));
+    const docs = await db.getAll(...studentIds.map((id) => db.collection(dataSpaceOfStudent(id).students).doc(id)));
     return new Map(
         docs.filter((d) => d.exists).map((d) => [d.id, (d.data() as Student).name.split(" ")[0]])
     );
@@ -169,7 +170,9 @@ export const saveAttendance = onCall<SaveAttendanceInput>({ region: REGION }, as
         );
     }
 
-    const classDoc = await db.collection("classes").doc(classId).get();
+    // The demo login (app-store review) keeps its registers in the demo set (shared/dataSpace.ts).
+    const data = dataSpace(me.demo);
+    const classDoc = await db.collection(data.classes).doc(classId).get();
     if (!classDoc.exists) {
         throw new HttpsError("not-found", "That class no longer exists.");
     }
@@ -178,7 +181,7 @@ export const saveAttendance = onCall<SaveAttendanceInput>({ region: REGION }, as
         throw new HttpsError("permission-denied", `Only the class teacher of ${cls.name} can mark its attendance.`);
     }
 
-    const ref = db.collection("attendance").doc(registerId(classId, date));
+    const ref = db.collection(data.attendance).doc(registerId(classId, date));
     type Outcome =
         | { register: Attendance; changes: Change[]; versions: Map<string, number> }
         | { refused: "conflict" | "locked"; register: Attendance };

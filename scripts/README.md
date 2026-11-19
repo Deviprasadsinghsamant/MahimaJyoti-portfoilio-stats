@@ -74,6 +74,27 @@ which the portal uses to number students added later. Dry run by default; add
 `-- --yes` to write. Existing IDs never change. Parents sign in to the app
 (`mj-app/`) with the Student ID and a mobile number on the student's record.
 
+## Demo logins for app-store review
+
+`npm run demo:review` (dry run; `-- --yes` to write, `-- --remove --yes` to delete)
+creates what Google Play's reviewers sign in with: *Demo Student* `MJ9001` (parent
+mobile `6000000002`) in *Class Demo*, with five subjects, a year of marks and a month of
+attendance, and a *Demo Teacher* login (phone `6000000001`), its class teacher.
+
+It's kept apart from the school entirely. Everything is stored in its own collections
+(`demoClasses`, `demoSubjects`, `demoStudents`, `demoResults`, `demoAttendance`,
+`demoAttendanceSummary`); the teacher login exists only in Firebase Auth (no `users`
+profile) with a `demo` claim. The website and the real app read only the school's
+collections, so nobody at school sees the demo. The Cloud Functions serve the demo
+logins from the demo set only (`mj-func/src/shared/dataSpace.ts`), and the Firestore
+rules refuse a demo token. The script checks the IDs and numbers don't clash with real
+data, removes any demo records an earlier version left in the school's collections, and
+is safe to run again.
+
+The teacher login has **no password** until you set one — run
+`npm run demo:review -- --password` in a terminal and type it (it isn't shown or
+stored). See `mj-app/PLAY_STORE.md`.
+
 ## Keep subjects in step with the timetable
 
 `npm run school:subjects` lists subjects in `school/timetable.ts` that a class in

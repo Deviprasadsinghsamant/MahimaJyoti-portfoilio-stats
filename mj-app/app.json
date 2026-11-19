@@ -3,7 +3,7 @@
     "name": "Mahima Jyoti",
     "slug": "mahimajyoti",
     "scheme": "mahimajyoti",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -19,7 +19,7 @@
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 3,
+      "versionCode": 4,
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -51,7 +51,8 @@
       ],
       "./plugins/withLongPathCmake",
       "./plugins/withReleaseSigning",
-      "./plugins/withNotificationIcon"
+      "./plugins/withNotificationIcon",
+      "./plugins/withOptionalPortraitScreen"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

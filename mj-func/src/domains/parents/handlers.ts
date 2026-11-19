@@ -21,6 +21,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "../../shared/firestore";
 import type { Result, SchoolClass, Student, Subject } from "../../shared/types";
+import { DEMO_DATA, dataSpaceOfStudent, type DataSpace, SCHOOL_DATA } from "../../shared/dataSpace";
 import { attendanceFor } from "../attendance/summary";
 import { changesSince, type Feed, readFeeds } from "./feed";
 import type { ChildChanges, ChildSnapshot, ParentResult, ParentStudent } from "./types";
@@ -148,26 +149,28 @@ async function recordFailure(code: string): Promise<void> {
     });
 }
 
-async function subjectsFor(results: Result[]): Promise<Map<string, Subject>> {
+async function subjectsFor(results: Result[], data: DataSpace): Promise<Map<string, Subject>> {
     const ids = Array.from(new Set(results.map((r) => r.subjectId)));
     if (ids.length === 0) return new Map();
-    const docs = await db.getAll(...ids.map((id) => db.collection("subjects").doc(id)));
+    const docs = await db.getAll(...ids.map((id) => db.collection(data.subjects).doc(id)));
     return new Map(docs.filter((d) => d.exists).map((d) => [d.id, d.data() as Subject]));
 }
 
 /**
  * Everything the app shows for one student: profile, every result, this year's
  * attendance. Pass the feed version read *before* this call, so a change made
- * meanwhile is fetched again rather than lost.
+ * meanwhile is fetched again rather than lost. The demo student's records come
+ * from the demo set (shared/dataSpace.ts).
  */
 export async function snapshotFor(student: Student, version?: number): Promise<ChildSnapshot> {
+    const data = dataSpaceOfStudent(student.id);
     const [resultSnap, classDoc] = await Promise.all([
-        db.collection("results").where("studentId", "==", student.id).get(),
-        db.collection("classes").doc(student.classId).get(),
+        db.collection(data.results).where("studentId", "==", student.id).get(),
+        db.collection(data.classes).doc(student.classId).get(),
     ]);
     const cls = classDoc.exists ? (classDoc.data() as SchoolClass) : undefined;
     const results = resultSnap.docs.map((d) => d.data() as Result);
-    const [subjects, attendance] = await Promise.all([subjectsFor(results), attendanceFor(student.id, cls?.academicYear)]);
+    const [subjects, attendance] = await Promise.all([subjectsFor(results, data), attendanceFor(student.id, cls?.academicYear)]);
     return {
         student: toParentStudent(student, cls),
         results: results.map((r) => toParentResult(r, subjects.get(r.subjectId))),
@@ -179,16 +182,17 @@ export async function snapshotFor(student: Student, version?: number): Promise<C
 
 /** What changed for a student since the phone's version, read from the changed documents themselves. */
 async function changesFor(studentId: string, feed: Feed, entries: { kind: string; id: string }[], known: Student | null): Promise<ChildChanges> {
+    const data = dataSpaceOfStudent(studentId);
     const resultIds = Array.from(new Set(entries.filter((e) => e.kind === "result").map((e) => e.id)));
     const profileChanged = entries.some((e) => e.kind !== "result");
     const [resultDocs, studentDoc] = await Promise.all([
-        resultIds.length ? db.getAll(...resultIds.map((id) => db.collection("results").doc(id))) : Promise.resolve([]),
-        profileChanged && !known ? db.collection("students").doc(studentId).get() : Promise.resolve(null),
+        resultIds.length ? db.getAll(...resultIds.map((id) => db.collection(data.results).doc(id))) : Promise.resolve([]),
+        profileChanged && !known ? db.collection(data.students).doc(studentId).get() : Promise.resolve(null),
     ]);
     // Deleted, or moved to another student: either way, gone from this child.
     const kept = resultDocs.filter((d) => d.exists && (d.data() as Result).studentId === studentId).map((d) => d.data() as Result);
     const removedResultIds = resultIds.filter((id) => !kept.some((r) => r.id === id));
-    const subjects = await subjectsFor(kept);
+    const subjects = await subjectsFor(kept, data);
     const changes: ChildChanges = {
         version: feed.version,
         results: kept.map((r) => toParentResult(r, subjects.get(r.subjectId))),
@@ -196,7 +200,7 @@ async function changesFor(studentId: string, feed: Feed, entries: { kind: string
     };
     const student = known ?? (studentDoc?.exists ? (studentDoc.data() as Student) : null);
     if (profileChanged && student) {
-        const cls = (await db.collection("classes").doc(student.classId).get()).data() as SchoolClass | undefined;
+        const cls = (await db.collection(data.classes).doc(student.classId).get()).data() as SchoolClass | undefined;
         changes.student = toParentStudent(student, cls);
         changes.attendance = await attendanceFor(studentId, cls?.academicYear);
     }
@@ -205,12 +209,20 @@ async function changesFor(studentId: string, feed: Feed, entries: { kind: string
 
 type Verified = { student: Student } | { error: SyncError };
 
+/** A student by Student ID: the school's records first, then the demo set (app-store review). */
+async function studentByCode(code: string): Promise<Student | null> {
+    for (const data of [SCHOOL_DATA, DEMO_DATA]) {
+        const found = await db.collection(data.students).where("studentCode", "==", code).limit(1).get();
+        if (!found.empty) return found.docs[0].data() as Student;
+    }
+    return null;
+}
+
 /** Check a Student ID / mobile pair, with the wrong-attempt limit. */
 async function verifyPair(code: string, mobile: string): Promise<Verified> {
     const attempts = await readAttempts(code);
     if (attempts && attempts.failures >= MAX_FAILURES) return { error: "rate-limited" };
-    const found = await db.collection("students").where("studentCode", "==", code).limit(1).get();
-    const student = found.empty ? null : (found.docs[0].data() as Student);
+    const student = await studentByCode(code);
     // Same answer for an unknown Student ID and a wrong number, so IDs can't be probed.
     if (!student || !mobilesOf(student).includes(mobile)) {
         await recordFailure(code);
@@ -295,7 +307,7 @@ async function updateChild(child: ChildInput, mode: Mode, device: Device, now: n
         return { result: { ok: false, studentCode: code, error: "too-soon", retryAt: last + CATCH_UP_INTERVAL_MS }, studentId };
     }
     if (!student) {
-        const doc = await db.collection("students").doc(studentId).get();
+        const doc = await db.collection(dataSpaceOfStudent(studentId).students).doc(studentId).get();
         if (!doc.exists) return { result: { ok: false, studentCode: code, error: "inactive" } };
         student = doc.data() as Student;
     }

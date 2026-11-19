@@ -212,7 +212,9 @@ export const updateStaffAccount = onCall<UpdateStaffInput>({ region: REGION }, a
         }
     }
     if (roleChanged) {
-        await admin.auth().setCustomUserClaims(uid, { role });
+        // Keep any other claim (e.g. demo, for the app-store review login).
+        const { customClaims } = await admin.auth().getUser(uid);
+        await admin.auth().setCustomUserClaims(uid, { ...customClaims, role });
     }
     // Revoke refresh tokens when access changes so the old session can't be
     // renewed. The ID token already issued stays valid until it expires (≤ 1 hour).
